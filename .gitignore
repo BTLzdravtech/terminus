@@ -2,6 +2,13 @@ app/node_modules
 app/assets/webpack
 
 node_modules
+!terminus-ssh/node_modules
+terminus-ssh/node_modules/*
+!terminus-ssh/node_modules/ssh2
+terminus-ssh/node_modules/ssh2/*
+!terminus-ssh/node_modules/ssh2/lib
+terminus-ssh/node_modules/ssh2/lib/*
+!terminus-ssh/node_modules/ssh2/lib/agent.js
 
 build/files.wxs
 dist
