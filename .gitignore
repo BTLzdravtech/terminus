@@ -9,6 +9,7 @@ terminus-ssh/node_modules/ssh2/*
 !terminus-ssh/node_modules/ssh2/lib
 terminus-ssh/node_modules/ssh2/lib/*
 !terminus-ssh/node_modules/ssh2/lib/agent.js
+!terminus-ssh/node_modules/ssh2/lib/client.js
 
 build/files.wxs
 dist

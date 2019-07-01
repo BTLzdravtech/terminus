@@ -150,7 +150,7 @@ export class SSHService {
                     host: session.connection.host,
                     port: session.connection.port || 22,
                     username: session.connection.user,
-                    password: session.connection.privateKey || agent ? undefined : '',
+                    password: session.connection.privateKey ? undefined : '',
                     privateKey,
                     passphrase: privateKeyPassphrase,
                     tryKeyboard: true,
