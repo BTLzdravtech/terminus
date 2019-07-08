@@ -1,6 +1,6 @@
 import { Component, Inject, Input, HostListener, HostBinding } from '@angular/core'
 import { trigger, style, animate, transition, state } from '@angular/animations'
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser'
+import { DomSanitizer } from '@angular/platform-browser'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 
 import { ElectronService } from '../services/electron.service'
@@ -15,7 +15,7 @@ import { TouchbarService } from '../services/touchbar.service'
 
 import { BaseTabComponent } from './baseTab.component'
 import { SafeModeModalComponent } from './safeModeModal.component'
-import { AppService, IToolbarButton, ToolbarButtonProvider } from '../api'
+import { AppService, ToolbarButton, ToolbarButtonProvider } from '../api'
 
 /** @hidden */
 @Component({
@@ -26,47 +26,47 @@ import { AppService, IToolbarButton, ToolbarButtonProvider } from '../api'
         trigger('animateTab', [
             state('in', style({
                 'flex-basis': '200px',
-                'width': '200px',
+                width: '200px',
             })),
             transition(':enter', [
                 style({
                     'flex-basis': '1px',
-                    'width': '1px',
+                    width: '1px',
                 }),
                 animate('250ms ease-in-out', style({
                     'flex-basis': '200px',
-                    'width': '200px',
-                }))
+                    width: '200px',
+                })),
             ]),
             transition(':leave', [
                 style({
                     'flex-basis': '200px',
-                    'width': '200px',
+                    width: '200px',
                 }),
                 animate('250ms ease-in-out', style({
                     'flex-basis': '1px',
-                    'width': '1px',
-                }))
-            ])
-        ])
-    ]
+                    width: '1px',
+                })),
+            ]),
+        ]),
+    ],
 })
 export class AppRootComponent {
     Platform = Platform
     @Input() ready = false
-    @Input() leftToolbarButtons: IToolbarButton[]
-    @Input() rightToolbarButtons: IToolbarButton[]
+    @Input() leftToolbarButtons: ToolbarButton[]
+    @Input() rightToolbarButtons: ToolbarButton[]
     @HostBinding('class.platform-win32') platformClassWindows = process.platform === 'win32'
     @HostBinding('class.platform-darwin') platformClassMacOS = process.platform === 'darwin'
     @HostBinding('class.platform-linux') platformClassLinux = process.platform === 'linux'
     @HostBinding('class.no-tabs') noTabs = true
     tabsDragging = false
     unsortedTabs: BaseTabComponent[] = []
-    updateIcon: SafeHtml
+    updateIcon: string
     updatesAvailable = false
     private logger: Logger
 
-    constructor (
+    private constructor (
         private docking: DockingService,
         private electron: ElectronService,
         private hotkeys: HotkeysService,
@@ -75,10 +75,10 @@ export class AppRootComponent {
         public hostApp: HostAppService,
         public config: ConfigService,
         public app: AppService,
+        private domSanitizer: DomSanitizer,
         @Inject(ToolbarButtonProvider) private toolbarButtonProviders: ToolbarButtonProvider[],
         log: LogService,
         ngbModal: NgbModal,
-        domSanitizer: DomSanitizer,
         _themes: ThemesService,
     ) {
         this.logger = log.create('main')
@@ -87,11 +87,11 @@ export class AppRootComponent {
         this.leftToolbarButtons = this.getToolbarButtons(false)
         this.rightToolbarButtons = this.getToolbarButtons(true)
 
-        this.updateIcon = domSanitizer.bypassSecurityTrustHtml(require('../icons/gift.svg')),
+        this.updateIcon = require('../icons/gift.svg')
 
-        this.hotkeys.matchedHotkey.subscribe((hotkey) => {
+        this.hotkeys.matchedHotkey.subscribe((hotkey: string) => {
             if (hotkey.startsWith('tab-')) {
-                let index = parseInt(hotkey.split('-')[1])
+                const index = parseInt(hotkey.split('-')[1])
                 if (index <= this.app.tabs.length) {
                     this.app.selectTab(this.app.tabs[index - 1])
                 }
@@ -233,20 +233,24 @@ export class AppRootComponent {
         })
     }
 
-    async generateButtonSubmenu (button: IToolbarButton) {
+    async generateButtonSubmenu (button: ToolbarButton) {
         if (button.submenu) {
             button.submenuItems = await button.submenu()
         }
     }
 
-    private getToolbarButtons (aboveZero: boolean): IToolbarButton[] {
-        let buttons: IToolbarButton[] = []
+    sanitizeIcon (icon: string): any {
+        return this.domSanitizer.bypassSecurityTrustHtml(icon || '')
+    }
+
+    private getToolbarButtons (aboveZero: boolean): ToolbarButton[] {
+        let buttons: ToolbarButton[] = []
         this.config.enabledServices(this.toolbarButtonProviders).forEach(provider => {
             buttons = buttons.concat(provider.provide())
         })
         return buttons
-            .filter((button) => (button.weight > 0) === aboveZero)
-            .sort((a: IToolbarButton, b: IToolbarButton) => (a.weight || 0) - (b.weight || 0))
+            .filter(button => button.weight > 0 === aboveZero)
+            .sort((a: ToolbarButton, b: ToolbarButton) => (a.weight || 0) - (b.weight || 0))
     }
 
     private updateVibrancy () {

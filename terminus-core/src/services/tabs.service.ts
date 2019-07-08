@@ -2,7 +2,8 @@ import { Injectable, ComponentFactoryResolver, Injector } from '@angular/core'
 import { BaseTabComponent } from '../components/baseTab.component'
 import { TabRecoveryService } from './tabRecovery.service'
 
-export declare type TabComponentType = new (...args: any[]) => BaseTabComponent
+// eslint-disable-next-line @typescript-eslint/no-type-alias
+export type TabComponentType = new (...args: any[]) => BaseTabComponent
 
 @Injectable({ providedIn: 'root' })
 export class TabsService {
@@ -17,9 +18,9 @@ export class TabsService {
      * Instantiates a tab component and assigns given inputs
      */
     create (type: TabComponentType, inputs?: any): BaseTabComponent {
-        let componentFactory = this.componentFactoryResolver.resolveComponentFactory(type)
-        let componentRef = componentFactory.create(this.injector)
-        let tab = componentRef.instance
+        const componentFactory = this.componentFactoryResolver.resolveComponentFactory(type)
+        const componentRef = componentFactory.create(this.injector)
+        const tab = componentRef.instance
         tab.hostView = componentRef.hostView
         Object.assign(tab, inputs || {})
         return tab
@@ -29,11 +30,11 @@ export class TabsService {
      * Duplicates an existing tab instance (using the tab recovery system)
      */
     async duplicate (tab: BaseTabComponent): Promise<BaseTabComponent> {
-        let token = await tab.getRecoveryToken()
+        const token = await tab.getRecoveryToken()
         if (!token) {
             return null
         }
-        let dup = await this.tabRecovery.recoverTab(token)
+        const dup = await this.tabRecovery.recoverTab(token)
         if (dup) {
             return this.create(dup.type, dup.options)
         }

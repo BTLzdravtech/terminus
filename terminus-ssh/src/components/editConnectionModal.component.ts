@@ -1,8 +1,9 @@
 import { Component } from '@angular/core'
-import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap'
+import { NgbModal, NgbActiveModal } from '@ng-bootstrap/ng-bootstrap'
 import { ElectronService, HostAppService } from 'terminus-core'
 import { PasswordStorageService } from '../services/passwordStorage.service'
 import { SSHConnection, LoginScript, SSHAlgorithmType } from '../api'
+import { PromptModalComponent } from './promptModal.component'
 import { ALGORITHMS } from 'ssh2-streams/lib/constants'
 
 /** @hidden */
@@ -11,7 +12,6 @@ import { ALGORITHMS } from 'ssh2-streams/lib/constants'
 })
 export class EditConnectionModalComponent {
     connection: SSHConnection
-    newScript: LoginScript
     hasSavedPassword: boolean
 
     supportedAlgorithms: {[id: string]: string[]} = {}
@@ -23,38 +23,54 @@ export class EditConnectionModalComponent {
         private electron: ElectronService,
         private hostApp: HostAppService,
         private passwordStorage: PasswordStorageService,
+        private ngbModal: NgbModal,
     ) {
-        this.newScript = { expect: '', send: '' }
-
-        for (let k of Object.values(SSHAlgorithmType)) {
-            this.supportedAlgorithms[k] = ALGORITHMS[{
+        for (const k of Object.values(SSHAlgorithmType)) {
+            const supportedAlg = {
                 [SSHAlgorithmType.KEX]: 'SUPPORTED_KEX',
                 [SSHAlgorithmType.HOSTKEY]: 'SUPPORTED_SERVER_HOST_KEY',
                 [SSHAlgorithmType.CIPHER]: 'SUPPORTED_CIPHER',
                 [SSHAlgorithmType.HMAC]: 'SUPPORTED_HMAC',
-            }[k]]
-            this.defaultAlgorithms[k] = ALGORITHMS[{
+            }[k]
+            const defaultAlg = {
                 [SSHAlgorithmType.KEX]: 'KEX',
                 [SSHAlgorithmType.HOSTKEY]: 'SERVER_HOST_KEY',
                 [SSHAlgorithmType.CIPHER]: 'CIPHER',
                 [SSHAlgorithmType.HMAC]: 'HMAC',
-            }[k]]
+            }[k]
+            this.supportedAlgorithms[k] = ALGORITHMS[supportedAlg]
+            this.defaultAlgorithms[k] = ALGORITHMS[defaultAlg]
         }
     }
 
     async ngOnInit () {
-        this.hasSavedPassword = !!(await this.passwordStorage.loadPassword(this.connection))
+        this.hasSavedPassword = !!await this.passwordStorage.loadPassword(this.connection)
         this.connection.algorithms = this.connection.algorithms || {}
-        for (let k of Object.values(SSHAlgorithmType)) {
+        this.connection.scripts = this.connection.scripts || []
+
+        for (const k of Object.values(SSHAlgorithmType)) {
             if (!this.connection.algorithms[k]) {
                 this.connection.algorithms[k] = this.defaultAlgorithms[k]
             }
 
             this.algorithms[k] = {}
-            for (let alg of this.connection.algorithms[k]) {
+            for (const alg of this.connection.algorithms[k]) {
                 this.algorithms[k][alg] = true
             }
         }
+    }
+
+    async setPassword () {
+        const modal = this.ngbModal.open(PromptModalComponent)
+        modal.componentInstance.prompt = `Password for ${this.connection.user}@${this.connection.host}`
+        modal.componentInstance.password = true
+        try {
+            const result = await modal.result
+            if (result && result.value) {
+                this.passwordStorage.savePassword(this.connection, result.value)
+                this.hasSavedPassword = true
+            }
+        } catch { }
     }
 
     clearSavedPassword () {
@@ -63,7 +79,7 @@ export class EditConnectionModalComponent {
     }
 
     selectPrivateKey () {
-        let path = this.electron.dialog.showOpenDialog(
+        const path = this.electron.dialog.showOpenDialog(
             this.hostApp.getWindow(),
             {
                 title: 'Select private key',
@@ -75,10 +91,10 @@ export class EditConnectionModalComponent {
     }
 
     save () {
-        for (let k of Object.values(SSHAlgorithmType)) {
+        for (const k of Object.values(SSHAlgorithmType)) {
             this.connection.algorithms[k] = Object.entries(this.algorithms[k])
-                .filter(([k, v]) => !!v)
-                .map(([k, v]) => k)
+                .filter(([_k, v]) => !!v)
+                .map(([k, _v]) => k)
         }
         this.modalInstance.close(this.connection)
     }
@@ -88,7 +104,7 @@ export class EditConnectionModalComponent {
     }
 
     moveScriptUp (script: LoginScript) {
-        let index = this.connection.scripts.indexOf(script)
+        const index = this.connection.scripts.indexOf(script)
         if (index > 0) {
             this.connection.scripts.splice(index, 1)
             this.connection.scripts.splice(index - 1, 0, script)
@@ -96,7 +112,7 @@ export class EditConnectionModalComponent {
     }
 
     moveScriptDown (script: LoginScript) {
-        let index = this.connection.scripts.indexOf(script)
+        const index = this.connection.scripts.indexOf(script)
         if (index >= 0 && index < this.connection.scripts.length - 1) {
             this.connection.scripts.splice(index, 1)
             this.connection.scripts.splice(index + 1, 0, script)
@@ -119,17 +135,6 @@ export class EditConnectionModalComponent {
     }
 
     addScript () {
-        if (!this.connection.scripts) {
-            this.connection.scripts = []
-        }
-        this.connection.scripts.push({ ...this.newScript })
-        this.clearScript()
-    }
-
-    clearScript () {
-        this.newScript.expect = ''
-        this.newScript.send = ''
-        this.newScript.isRegex = false
-        this.newScript.optional = false
+        this.connection.scripts.push({ expect: '', send: '' })
     }
 }

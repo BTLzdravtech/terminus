@@ -4,7 +4,7 @@ const webpack = require('webpack')
 module.exports = {
   target: 'node',
   entry: 'src/index.ts',
-  devtool: 'eval-source-map',
+  devtool: 'source-map',
   context: __dirname,
   mode: 'development',
   output: {
@@ -51,10 +51,6 @@ module.exports = {
     'fs',
     'os',
     'path',
-    'deepmerge',
-    'untildify',
-    'winston',
-    'js-yaml',
     'windows-native-registry',
     /^rxjs/,
     /^@angular/,

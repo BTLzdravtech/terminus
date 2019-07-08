@@ -1,12 +1,14 @@
 import { Observable } from 'rxjs'
 import { debounceTime, distinctUntilChanged, map } from 'rxjs/operators'
 import { exec } from 'mz/child_process'
-import deepEqual = require('deep-equal')
-const fontManager = require('fontmanager-redux')
+import deepEqual from 'deep-equal'
+const fontManager = require('fontmanager-redux') // eslint-disable-line
 
 import { Component, Inject } from '@angular/core'
 import { ConfigService, HostAppService, Platform, ElectronService } from 'terminus-core'
-import { TerminalColorSchemeProvider, ITerminalColorScheme } from '../api'
+import { TerminalColorSchemeProvider } from '../api/colorSchemeProvider'
+import { TerminalColorScheme } from '../api/interfaces'
+import { getCSSFontFamily } from '../utils'
 
 /** @hidden */
 @Component({
@@ -15,9 +17,9 @@ import { TerminalColorSchemeProvider, ITerminalColorScheme } from '../api'
 })
 export class AppearanceSettingsTabComponent {
     fonts: string[] = []
-    colorSchemes: ITerminalColorScheme[] = []
+    colorSchemes: TerminalColorScheme[] = []
     equalComparator = deepEqual
-    editingColorScheme: ITerminalColorScheme
+    editingColorScheme: TerminalColorScheme
     schemeChanged = false
 
     constructor (
@@ -29,8 +31,8 @@ export class AppearanceSettingsTabComponent {
 
     async ngOnInit () {
         if (this.hostApp.platform === Platform.Windows || this.hostApp.platform === Platform.macOS) {
-            let fonts = await new Promise<any[]>((resolve) => fontManager.findFonts({ monospace: true }, resolve))
-            this.fonts = fonts.map(x => (x.family + ' ' + x.style).trim())
+            const fonts = await new Promise<any[]>((resolve) => fontManager.findFonts({ monospace: true }, resolve))
+            this.fonts = fonts.map(x => `${x.family} ${x.style}`.trim())
             this.fonts.sort()
         }
         if (this.hostApp.platform === Platform.Linux) {
@@ -48,14 +50,14 @@ export class AppearanceSettingsTabComponent {
 
     fontAutocomplete = (text$: Observable<string>) => {
         return text$.pipe(
-          debounceTime(200),
-          distinctUntilChanged(),
-          map(query => this.fonts.filter(v => new RegExp(query, 'gi').test(v))),
-          map(list => Array.from(new Set(list))),
-      )
+            debounceTime(200),
+            distinctUntilChanged(),
+            map(query => this.fonts.filter(v => new RegExp(query, 'gi').test(v))),
+            map(list => Array.from(new Set(list))),
+        )
     }
 
-    editScheme (scheme: ITerminalColorScheme) {
+    editScheme (scheme: TerminalColorScheme) {
         this.editingColorScheme = scheme
         this.schemeChanged = false
     }
@@ -73,7 +75,7 @@ export class AppearanceSettingsTabComponent {
         this.editingColorScheme = null
     }
 
-    async deleteScheme (scheme: ITerminalColorScheme) {
+    async deleteScheme (scheme: TerminalColorScheme) {
         if ((await this.electron.showMessageBox(
             this.hostApp.getWindow(),
             {
@@ -90,11 +92,15 @@ export class AppearanceSettingsTabComponent {
         }
     }
 
-    isCustomScheme (scheme: ITerminalColorScheme) {
+    isCustomScheme (scheme: TerminalColorScheme) {
         return this.config.store.terminal.customColorSchemes.some(x => deepEqual(x, scheme))
     }
 
     colorsTrackBy (index) {
         return index
+    }
+
+    getPreviewFontFamily () {
+        return getCSSFontFamily(this.config.store.terminal.font)
     }
 }

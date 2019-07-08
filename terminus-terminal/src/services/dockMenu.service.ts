@@ -7,7 +7,7 @@ import { TerminalService } from './terminal.service'
 export class DockMenuService {
     appVersion: string
 
-    constructor (
+    private constructor (
         private electron: ElectronService,
         private config: ConfigService,
         private hostApp: HostAppService,
@@ -29,7 +29,7 @@ export class DockMenuService {
                     title: profile.name,
                     iconPath: process.execPath,
                     iconIndex: 0,
-                }))
+                })),
             }] : null)
         }
         if (this.hostApp.platform === Platform.macOS) {

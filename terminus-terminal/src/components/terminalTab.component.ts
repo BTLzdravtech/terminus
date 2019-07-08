@@ -2,8 +2,8 @@ import { Component, Input } from '@angular/core'
 import { Subscription } from 'rxjs'
 import { first } from 'rxjs/operators'
 import { BaseTabProcess } from 'terminus-core'
-import { BaseTerminalTabComponent } from './baseTerminalTab.component'
-import { SessionOptions } from '../api'
+import { BaseTerminalTabComponent } from '../api/baseTerminalTab.component'
+import { SessionOptions } from '../api/interfaces'
 import { Session } from '../services/sessions.service'
 import { WIN_BUILD_CONPTY_SUPPORTED, isWindowsBuild } from '../utils'
 
@@ -12,6 +12,7 @@ import { WIN_BUILD_CONPTY_SUPPORTED, isWindowsBuild } from '../utils'
     selector: 'terminalTab',
     template: BaseTerminalTabComponent.template,
     styles: BaseTerminalTabComponent.styles,
+    animations: BaseTerminalTabComponent.animations,
 })
 export class TerminalTabComponent extends BaseTerminalTabComponent {
     @Input() sessionOptions: SessionOptions
@@ -21,19 +22,19 @@ export class TerminalTabComponent extends BaseTerminalTabComponent {
         this.logger = this.log.create('terminalTab')
         this.session = new Session(this.config)
 
-        let isConPTY = isWindowsBuild(WIN_BUILD_CONPTY_SUPPORTED) && this.config.store.terminal.useConPTY
+        const isConPTY = isWindowsBuild(WIN_BUILD_CONPTY_SUPPORTED) && this.config.store.terminal.useConPTY
 
         this.homeEndSubscription = this.hotkeys.matchedHotkey.subscribe(hotkey => {
             if (!this.hasFocus) {
                 return
             }
             switch (hotkey) {
-            case 'home':
-                this.sendInput(isConPTY ? '\x1b[H' : '\x1bOH')
-                break
-            case 'end':
-                this.sendInput(isConPTY ? '\x1b[F' : '\x1bOF')
-                break
+                case 'home':
+                    this.sendInput(isConPTY ? '\x1b[H' : '\x1bOH')
+                    break
+                case 'end':
+                    this.sendInput(isConPTY ? '\x1b[F' : '\x1bOF')
+                    break
             }
         })
 
@@ -57,7 +58,7 @@ export class TerminalTabComponent extends BaseTerminalTabComponent {
     }
 
     async getRecoveryToken (): Promise<any> {
-        let cwd = this.session ? await this.session.getWorkingDirectory() : null
+        const cwd = this.session ? await this.session.getWorkingDirectory() : null
         return {
             type: 'app:terminal-tab',
             sessionOptions: {
@@ -68,17 +69,17 @@ export class TerminalTabComponent extends BaseTerminalTabComponent {
     }
 
     async getCurrentProcess (): Promise<BaseTabProcess> {
-        let children = await this.session.getChildProcesses()
+        const children = await this.session.getChildProcesses()
         if (!children.length) {
             return null
         }
         return {
-            name: children[0].command
+            name: children[0].command,
         }
     }
 
     async canClose (): Promise<boolean> {
-        let children = await this.session.getChildProcesses()
+        const children = await this.session.getChildProcesses()
         if (children.length === 0) {
             return true
         }

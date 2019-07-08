@@ -4,7 +4,7 @@ import { AppService } from './app.service'
 import { ConfigService } from './config.service'
 import { ElectronService } from './electron.service'
 import { HostAppService, Platform } from './hostApp.service'
-import { IToolbarButton, ToolbarButtonProvider } from '../api'
+import { ToolbarButton, ToolbarButtonProvider } from '../api'
 
 /** @hidden */
 @Injectable({ providedIn: 'root' })
@@ -28,19 +28,19 @@ export class TouchbarService {
         app.tabsChanged$.subscribe(() => this.updateTabs())
         app.activeTabChange$.subscribe(() => this.updateTabs())
 
-        let activityIconPath = `${electron.app.getAppPath()}/assets/activity.png`
-        let activityIcon = this.electron.nativeImage.createFromPath(activityIconPath)
+        const activityIconPath = `${electron.app.getAppPath()}/assets/activity.png`
+        const activityIcon = this.electron.nativeImage.createFromPath(activityIconPath)
         app.tabOpened$.subscribe(tab => {
             tab.titleChange$.subscribe(title => {
-                let segment = this.tabSegments[app.tabs.indexOf(tab)]
+                const segment = this.tabSegments[app.tabs.indexOf(tab)]
                 if (segment) {
                     segment.label = this.shortenTitle(title)
                     this.tabsSegmentedControl.segments = this.tabSegments
                 }
             })
             tab.activity$.subscribe(hasActivity => {
-                let showIcon = this.app.activeTab !== tab && hasActivity
-                let segment = this.tabSegments[app.tabs.indexOf(tab)]
+                const showIcon = this.app.activeTab !== tab && hasActivity
+                const segment = this.tabSegments[app.tabs.indexOf(tab)]
                 if (segment) {
                     segment.icon = showIcon ? activityIcon : null
                 }
@@ -61,7 +61,7 @@ export class TouchbarService {
             return
         }
 
-        let buttons: IToolbarButton[] = []
+        let buttons: ToolbarButton[] = []
         this.config.enabledServices(this.toolbarButtonProviders).forEach(provider => {
             buttons = buttons.concat(provider.provide())
         })
@@ -76,7 +76,7 @@ export class TouchbarService {
             selectedIndex: this.app.tabs.indexOf(this.app.activeTab),
             change: (selectedIndex) => this.zone.run(() => {
                 this.app.selectTab(this.app.tabs[selectedIndex])
-            })
+            }),
         })
 
         this.buttonsSegmentedControl = new this.electron.TouchBar.TouchBarSegmentedControl({
@@ -84,21 +84,21 @@ export class TouchbarService {
             mode: 'buttons',
             change: (selectedIndex) => this.zone.run(() => {
                 buttons[selectedIndex].click()
-            })
+            }),
         })
 
-        let touchBar = new this.electron.TouchBar({
+        const touchBar = new this.electron.TouchBar({
             items: [
                 this.tabsSegmentedControl,
                 new this.electron.TouchBar.TouchBarSpacer({ size: 'flexible' }),
                 new this.electron.TouchBar.TouchBarSpacer({ size: 'small' }),
                 this.buttonsSegmentedControl,
-            ]
+            ],
         })
         this.hostApp.setTouchBar(touchBar)
     }
 
-    private getButton (button: IToolbarButton): Electron.SegmentedControlSegment {
+    private getButton (button: ToolbarButton): Electron.SegmentedControlSegment {
         return {
             label: button.touchBarNSImage ? null : this.shortenTitle(button.touchBarTitle || button.title),
             icon: button.touchBarNSImage ? this.getCachedNSImage(button.touchBarNSImage) : null,

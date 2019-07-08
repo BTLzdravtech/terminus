@@ -10,9 +10,11 @@ import { SSHConnection, SSHSession } from '../api'
         <div
             #content
             class="content"
+            [style.opacity]='frontendIsReady ? 1 : 0'
         ></div>
     `,
-    styles: [require('./sshTab.component.scss')],
+    styles: [require('./sshTab.component.scss'), ...BaseTerminalTabComponent.styles],
+    animations: BaseTerminalTabComponent.animations,
 })
 export class SSHTabComponent extends BaseTerminalTabComponent {
     connection: SSHConnection
@@ -42,7 +44,7 @@ export class SSHTabComponent extends BaseTerminalTabComponent {
         this.session = new SSHSession(this.connection)
         this.attachSessionHandlers()
         this.write(`Connecting to ${this.connection.host}`)
-        let interval = setInterval(() => this.write('.'), 500)
+        const interval = setInterval(() => this.write('.'), 500)
         try {
             await this.ssh.connectSession(this.session, message => {
                 this.write('\r\n' + message)

@@ -1,6 +1,6 @@
 import { Injectable, Inject, NgZone, EventEmitter } from '@angular/core'
-import { IHotkeyDescription, HotkeyProvider } from '../api/hotkeyProvider'
-import { NativeKeyEvent, stringifyKeySequence } from './hotkeys.util'
+import { HotkeyDescription, HotkeyProvider } from '../api/hotkeyProvider'
+import { stringifyKeySequence } from './hotkeys.util'
 import { ConfigService } from '../services/config.service'
 import { ElectronService } from '../services/electron.service'
 
@@ -13,29 +13,28 @@ export interface PartialHotkeyMatch {
 const KEY_TIMEOUT = 2000
 
 interface EventBufferEntry {
-    event: NativeKeyEvent
+    event: KeyboardEvent
     time: number
 }
 
 @Injectable({ providedIn: 'root' })
 export class HotkeysService {
-    key = new EventEmitter<NativeKeyEvent>()
+    key = new EventEmitter<KeyboardEvent>()
     matchedHotkey = new EventEmitter<string>()
-    globalHotkey = new EventEmitter()
+    globalHotkey = new EventEmitter<void>()
     private currentKeystrokes: EventBufferEntry[] = []
     private disabledLevel = 0
-    private hotkeyDescriptions: IHotkeyDescription[] = []
+    private hotkeyDescriptions: HotkeyDescription[] = []
 
-    /** @hidden */
-    constructor (
+    private constructor (
         private zone: NgZone,
         private electron: ElectronService,
         private config: ConfigService,
         @Inject(HotkeyProvider) private hotkeyProviders: HotkeyProvider[],
     ) {
-        let events = ['keydown', 'keyup']
-        events.forEach((event) => {
-            document.addEventListener(event, (nativeEvent) => {
+        const events = ['keydown', 'keyup']
+        events.forEach(event => {
+            document.addEventListener(event, (nativeEvent: KeyboardEvent) => {
                 if (document.querySelectorAll('input:focus').length === 0) {
                     this.pushKeystroke(event, nativeEvent)
                     this.processKeystrokes()
@@ -58,8 +57,8 @@ export class HotkeysService {
      * @param name DOM event name
      * @param nativeEvent event object
      */
-    pushKeystroke (name, nativeEvent) {
-        nativeEvent.event = name
+    pushKeystroke (name: string, nativeEvent: KeyboardEvent) {
+        (nativeEvent as any).event = name
         this.currentKeystrokes.push({ event: nativeEvent, time: performance.now() })
     }
 
@@ -69,7 +68,7 @@ export class HotkeysService {
     processKeystrokes () {
         if (this.isEnabled()) {
             this.zone.run(() => {
-                let matched = this.getCurrentFullyMatchedHotkey()
+                const matched = this.getCurrentFullyMatchedHotkey()
                 if (matched) {
                     console.log('Matched hotkey', matched)
                     this.matchedHotkey.emit(matched)
@@ -79,7 +78,7 @@ export class HotkeysService {
         }
     }
 
-    emitKeyEvent (nativeEvent) {
+    emitKeyEvent (nativeEvent: KeyboardEvent) {
         this.zone.run(() => {
             this.key.emit(nativeEvent)
         })
@@ -94,61 +93,16 @@ export class HotkeysService {
         return stringifyKeySequence(this.currentKeystrokes.map(x => x.event))
     }
 
-    private registerGlobalHotkey () {
-        this.electron.globalShortcut.unregisterAll()
-        let value = this.config.store.hotkeys['toggle-window'] || []
-        if (typeof value === 'string') {
-            value = [value]
-        }
-        value.forEach(item => {
-            item = (typeof item === 'string') ? [item] : item
-
-            try {
-                this.electron.globalShortcut.register(item[0].replace(/-/g, '+'), () => {
-                    this.globalHotkey.emit()
-                })
-            } catch (err) {
-                console.error('Could not register the global hotkey:', err)
-            }
-        })
-    }
-
-    private getHotkeysConfig () {
-        return this.getHotkeysConfigRecursive(this.config.store.hotkeys)
-    }
-
-    private getHotkeysConfigRecursive (branch) {
-        let keys = {}
-        for (let key in branch) {
-            let value = branch[key]
-            if (value instanceof Object && !(value instanceof Array)) {
-                let subkeys = this.getHotkeysConfigRecursive(value)
-                for (let subkey in subkeys) {
-                    keys[key + '.' + subkey] = subkeys[subkey]
-                }
-            } else {
-                if (typeof value === 'string') {
-                    value = [value]
-                }
-                if (value) {
-                    value = value.map((item) => (typeof item === 'string') ? [item] : item)
-                    keys[key] = value
-                }
-            }
-        }
-        return keys
-    }
-
-    private getCurrentFullyMatchedHotkey (): string {
-        let currentStrokes = this.getCurrentKeystrokes()
-        let config = this.getHotkeysConfig()
-        for (let id in config) {
-            for (let sequence of config[id]) {
+    getCurrentFullyMatchedHotkey (): string {
+        const currentStrokes = this.getCurrentKeystrokes()
+        const config = this.getHotkeysConfig()
+        for (const id in config) {
+            for (const sequence of config[id]) {
                 if (currentStrokes.length < sequence.length) {
                     continue
                 }
                 if (sequence.every(
-                    (x, index) =>
+                    (x: string, index: number) =>
                         x.toLowerCase() ===
                             currentStrokes[currentStrokes.length - sequence.length + index].toLowerCase()
                 )) {
@@ -160,21 +114,21 @@ export class HotkeysService {
     }
 
     getCurrentPartiallyMatchedHotkeys (): PartialHotkeyMatch[] {
-        let currentStrokes = this.getCurrentKeystrokes()
-        let config = this.getHotkeysConfig()
-        let result = []
-        for (let id in config) {
-            for (let sequence of config[id]) {
+        const currentStrokes = this.getCurrentKeystrokes()
+        const config = this.getHotkeysConfig()
+        const result = []
+        for (const id in config) {
+            for (const sequence of config[id]) {
                 for (let matchLength = Math.min(currentStrokes.length, sequence.length); matchLength > 0; matchLength--) {
                     if (sequence.slice(0, matchLength).every(
-                        (x, index) =>
+                        (x: string, index: number) =>
                             x.toLowerCase() ===
                                 currentStrokes[currentStrokes.length - matchLength + index].toLowerCase()
                     )) {
                         result.push({
                             matchedLength: matchLength,
                             id,
-                            strokes: sequence
+                            strokes: sequence,
                         })
                         break
                     }
@@ -184,7 +138,7 @@ export class HotkeysService {
         return result
     }
 
-    getHotkeyDescription (id: string): IHotkeyDescription {
+    getHotkeyDescription (id: string): HotkeyDescription {
         return this.hotkeyDescriptions.filter((x) => x.id === id)[0]
     }
 
@@ -200,12 +154,61 @@ export class HotkeysService {
         return this.disabledLevel === 0
     }
 
-    async getHotkeyDescriptions (): Promise<IHotkeyDescription[]> {
+    async getHotkeyDescriptions (): Promise<HotkeyDescription[]> {
         return (
             await Promise.all(
                 this.config.enabledServices(this.hotkeyProviders)
                     .map(async x => x.provide ? x.provide() : x.hotkeys)
             )
         ).reduce((a, b) => a.concat(b))
+    }
+
+    private registerGlobalHotkey () {
+        this.electron.globalShortcut.unregisterAll()
+        let value = this.config.store.hotkeys['toggle-window'] || []
+        if (typeof value === 'string') {
+            value = [value]
+        }
+        value.forEach((item: string | string[]) => {
+            item = typeof item === 'string' ? [item] : item
+
+            try {
+                let electronKeySpec = item[0]
+                electronKeySpec = electronKeySpec.replace('⌘', 'Command')
+                electronKeySpec = electronKeySpec.replace('⌥', 'Alt')
+                electronKeySpec = electronKeySpec.replace(/-/g, '+')
+                this.electron.globalShortcut.register(electronKeySpec, () => {
+                    this.globalHotkey.emit()
+                })
+            } catch (err) {
+                console.error('Could not register the global hotkey:', err)
+            }
+        })
+    }
+
+    private getHotkeysConfig () {
+        return this.getHotkeysConfigRecursive(this.config.store.hotkeys)
+    }
+
+    private getHotkeysConfigRecursive (branch: any) {
+        const keys = {}
+        for (const key in branch) {
+            let value = branch[key]
+            if (value instanceof Object && !(value instanceof Array)) {
+                const subkeys = this.getHotkeysConfigRecursive(value)
+                for (const subkey in subkeys) {
+                    keys[key + '.' + subkey] = subkeys[subkey]
+                }
+            } else {
+                if (typeof value === 'string') {
+                    value = [value]
+                }
+                if (value) {
+                    value = value.map((item: string | string[]) => typeof item === 'string' ? [item] : item)
+                    keys[key] = value
+                }
+            }
+        }
+        return keys
     }
 }

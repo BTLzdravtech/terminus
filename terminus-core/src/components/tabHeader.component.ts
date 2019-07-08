@@ -10,6 +10,11 @@ import { AppService } from '../services/app.service'
 import { HostAppService, Platform } from '../services/hostApp.service'
 
 /** @hidden */
+export interface ISortableComponent {
+    setDragHandle (_: HTMLElement)
+}
+
+/** @hidden */
 @Component({
     selector: 'tab-header',
     template: require('./tabHeader.component.pug'),
@@ -23,13 +28,13 @@ export class TabHeaderComponent {
     @Input() progress: number
     @ViewChild('handle') handle: ElementRef
 
-    constructor (
+    private constructor (
         public app: AppService,
         private electron: ElectronService,
         private hostApp: HostAppService,
         private ngbModal: NgbModal,
         private hotkeys: HotkeysService,
-        private parentDraggable: SortableComponent,
+        @Inject(SortableComponent) private parentDraggable: ISortableComponent,
         @Optional() @Inject(TabContextMenuItemProvider) protected contextMenuProviders: TabContextMenuItemProvider[],
     ) {
         this.hotkeys.matchedHotkey.subscribe((hotkey) => {
@@ -52,7 +57,7 @@ export class TabHeaderComponent {
     }
 
     showRenameTabModal (): void {
-        let modal = this.ngbModal.open(RenameTabModalComponent)
+        const modal = this.ngbModal.open(RenameTabModalComponent)
         modal.componentInstance.value = this.tab.customTitle || this.tab.title
         modal.result.then(result => {
             this.tab.setTitle(result)
@@ -62,7 +67,7 @@ export class TabHeaderComponent {
 
     async buildContextMenu (): Promise<Electron.MenuItemConstructorOptions[]> {
         let items: Electron.MenuItemConstructorOptions[] = []
-        for (let section of await Promise.all(this.contextMenuProviders.map(x => x.getItems(this.tab, this)))) {
+        for (const section of await Promise.all(this.contextMenuProviders.map(x => x.getItems(this.tab, this)))) {
             items.push({ type: 'separator' })
             items = items.concat(section)
         }
@@ -85,7 +90,6 @@ export class TabHeaderComponent {
             contextMenu.popup({
                 x: $event.pageX,
                 y: $event.pageY,
-                async: true,
             })
         }
     }

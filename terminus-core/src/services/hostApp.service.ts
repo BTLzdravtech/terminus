@@ -1,5 +1,5 @@
 import * as path from 'path'
-import shellEscape = require('shell-escape')
+import shellEscape from 'shell-escape'
 import { Observable, Subject } from 'rxjs'
 import { Injectable, NgZone, EventEmitter } from '@angular/core'
 import { ElectronService } from './electron.service'
@@ -87,8 +87,7 @@ export class HostAppService {
 
     get displayMetricsChanged$ (): Observable<void> { return this.displayMetricsChanged }
 
-    /** @hidden */
-    constructor (
+    private constructor (
         private zone: NgZone,
         private electron: ElectronService,
         log: LogService,
@@ -97,7 +96,7 @@ export class HostAppService {
         this.platform = {
             win32: Platform.Windows,
             darwin: Platform.macOS,
-            linux: Platform.Linux
+            linux: Platform.Linux,
         }[process.platform]
 
         this.windowId = parseInt(location.search.substring(1))
@@ -170,7 +169,7 @@ export class HostAppService {
     }
 
     toggleFullscreen () {
-        let window = this.getWindow()
+        const window = this.getWindow()
         window.setFullScreen(!this.isFullScreen)
     }
 

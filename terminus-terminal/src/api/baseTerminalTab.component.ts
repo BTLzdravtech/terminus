@@ -2,29 +2,42 @@ import { Observable, Subject, Subscription } from 'rxjs'
 import { first } from 'rxjs/operators'
 import { ToastrService } from 'ngx-toastr'
 import { NgZone, OnInit, OnDestroy, Inject, Injector, Optional, ViewChild, HostBinding, Input, ElementRef } from '@angular/core'
+import { trigger, transition, style, animate, AnimationTriggerMetadata } from '@angular/animations'
 import { AppService, ConfigService, BaseTabComponent, ElectronService, HostAppService, HotkeysService, Platform, LogService, Logger } from 'terminus-core'
 
 import { BaseSession, SessionsService } from '../services/sessions.service'
 import { TerminalFrontendService } from '../services/terminalFrontend.service'
 
-import { TerminalDecorator, ResizeEvent, TerminalContextMenuItemProvider } from '../api'
 import { Frontend } from '../frontends/frontend'
+import { ResizeEvent } from './interfaces'
+import { TerminalDecorator } from './decorator'
+import { TerminalContextMenuItemProvider } from './contextMenuProvider'
 
+
+/** @hidden */
+export interface IToastrService {
+    info (_: string)
+}
 /**
  * A class to base your custom terminal tabs on
  */
 export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit, OnDestroy {
-    static template = `
-        <div
-            #content
-            class="content"
-            [style.opacity]="frontendIsReady ? 1 : 0"
-        ></div>
-    `
-    static styles = [require('./terminalTab.component.scss')]
+    static template = require('../components/baseTerminalTab.component.pug')
+    static styles = [require('../components/terminalTab.component.scss')]
+    static animations: AnimationTriggerMetadata[] = [trigger('slideInOut', [
+        transition(':enter', [
+            style({ transform: 'translateY(-25%)' }),
+            animate('100ms ease-in-out', style({ transform: 'translateY(0%)' })),
+        ]),
+        transition(':leave', [
+            animate('100ms ease-in-out', style({ transform: 'translateY(-25%)' })),
+        ]),
+    ])]
 
     session: BaseSession
     @Input() zoom = 0
+
+    @Input() showSearchPanel = false
 
     /** @hidden */
     @ViewChild('content') content
@@ -67,7 +80,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         protected sessions: SessionsService,
         protected electron: ElectronService,
         protected terminalContainersService: TerminalFrontendService,
-        protected toastr: ToastrService,
+        @Inject(ToastrService) protected toastr: IToastrService,
         protected log: LogService,
         @Optional() @Inject(TerminalDecorator) protected decorators: TerminalDecorator[],
         @Optional() @Inject(TerminalContextMenuItemProvider) protected contextMenuProviders: TerminalContextMenuItemProvider[],
@@ -82,46 +95,53 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                 return
             }
             switch (hotkey) {
-            case 'ctrl-c':
-                if (this.frontend.getSelection()) {
+                case 'ctrl-c':
+                    if (this.frontend.getSelection()) {
+                        this.frontend.copySelection()
+                        this.frontend.clearSelection()
+                        this.toastr.info('Copied')
+                    } else {
+                        this.sendInput('\x03')
+                    }
+                    break
+                case 'copy':
                     this.frontend.copySelection()
                     this.frontend.clearSelection()
                     this.toastr.info('Copied')
-                } else {
-                    this.sendInput('\x03')
-                }
-                break
-            case 'copy':
-                this.frontend.copySelection()
-                this.toastr.info('Copied')
-                break
-            case 'paste':
-                this.paste()
-                break
-            case 'clear':
-                this.frontend.clear()
-                break
-            case 'zoom-in':
-                this.zoomIn()
-                break
-            case 'zoom-out':
-                this.zoomOut()
-                break
-            case 'reset-zoom':
-                this.resetZoom()
-                break
-            case 'previous-word':
-                this.sendInput('\x1bb')
-                break
-            case 'next-word':
-                this.sendInput('\x1bf')
-                break
-            case 'delete-previous-word':
-                this.sendInput('\x1b\x7f')
-                break
-            case 'delete-next-word':
-                this.sendInput('\x1bd')
-                break
+                    break
+                case 'paste':
+                    this.paste()
+                    break
+                case 'clear':
+                    this.frontend.clear()
+                    break
+                case 'zoom-in':
+                    this.zoomIn()
+                    break
+                case 'zoom-out':
+                    this.zoomOut()
+                    break
+                case 'reset-zoom':
+                    this.resetZoom()
+                    break
+                case 'previous-word':
+                    this.sendInput('\x1bb')
+                    break
+                case 'next-word':
+                    this.sendInput('\x1bf')
+                    break
+                case 'delete-previous-word':
+                    this.sendInput('\x1b\x7f')
+                    break
+                case 'delete-next-word':
+                    this.sendInput('\x1bd')
+                    break
+                case 'search':
+                    this.showSearchPanel = true
+                    setImmediate(() => {
+                        this.element.nativeElement.querySelector('.search-input').focus()
+                    })
+                    break
             }
         })
         this.bellPlayer = document.createElement('audio')
@@ -169,7 +189,11 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         this.configure()
 
         this.config.enabledServices(this.decorators).forEach((decorator) => {
-            decorator.attach(this)
+            try {
+                decorator.attach(this)
+            } catch (e) {
+                this.logger.warn('Decorator attach() throws', e)
+            }
         })
 
         setTimeout(() => {
@@ -192,95 +216,12 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
 
     async buildContextMenu (): Promise<Electron.MenuItemConstructorOptions[]> {
         let items: Electron.MenuItemConstructorOptions[] = []
-        for (let section of await Promise.all(this.contextMenuProviders.map(x => x.getItems(this)))) {
+        for (const section of await Promise.all(this.contextMenuProviders.map(x => x.getItems(this)))) {
             items = items.concat(section)
             items.push({ type: 'separator' })
         }
         items.splice(items.length - 1, 1)
         return items
-    }
-
-    protected detachTermContainerHandlers () {
-        for (let subscription of this.termContainerSubscriptions) {
-            subscription.unsubscribe()
-        }
-        this.termContainerSubscriptions = []
-    }
-
-    protected attachTermContainerHandlers () {
-        this.detachTermContainerHandlers()
-
-        const maybeConfigure = () => {
-            if (this.hasFocus) {
-                setTimeout(() => this.configure(), 250)
-            }
-        }
-
-        this.termContainerSubscriptions = [
-            this.frontend.title$.subscribe(title => this.zone.run(() => this.setTitle(title))),
-
-            this.focused$.subscribe(() => this.frontend.enableResizing = true),
-            this.blurred$.subscribe(() => this.frontend.enableResizing = false),
-
-            this.frontend.mouseEvent$.subscribe(async event => {
-                if (event.type === 'mousedown') {
-                    if (event.which === 2) {
-                        this.paste()
-                        event.preventDefault()
-                        event.stopPropagation()
-                        return
-                    }
-                    if (event.which === 3) {
-                        if (this.config.store.terminal.rightClick === 'menu') {
-                            this.hostApp.popupContextMenu(await this.buildContextMenu())
-                        } else if (this.config.store.terminal.rightClick === 'paste') {
-                            this.paste()
-                        }
-                        event.preventDefault()
-                        event.stopPropagation()
-                        return
-                    }
-                }
-                if (event.type === 'mousewheel') {
-                    let wheelDeltaY = 0
-
-                    if ('wheelDeltaY' in event) {
-                        wheelDeltaY = (event as MouseWheelEvent)['wheelDeltaY']
-                    } else {
-                        wheelDeltaY = (event as MouseWheelEvent)['deltaY']
-                    }
-                    if (event.ctrlKey || event.metaKey) {
-
-                        if (wheelDeltaY > 0) {
-                            this.zoomIn()
-                        } else {
-                            this.zoomOut()
-                        }
-                    } else if (event.altKey) {
-                        event.preventDefault()
-                        let delta = Math.round(wheelDeltaY / 50)
-                        this.sendInput(((delta > 0) ? '\u001bOA' : '\u001bOB').repeat(Math.abs(delta)))
-                    }
-                }
-            }),
-
-            this.frontend.input$.subscribe(data => {
-                this.sendInput(data)
-            }),
-
-            this.frontend.resize$.subscribe(({ columns, rows }) => {
-                this.logger.debug(`Resizing to ${columns}x${rows}`)
-                this.size = { columns, rows }
-                this.zone.run(() => {
-                    if (this.session && this.session.open) {
-                        this.session.resize(columns, rows)
-                    }
-                })
-            }),
-
-            this.hostApp.displayMetricsChanged$.subscribe(maybeConfigure),
-            this.hostApp.windowMoved$.subscribe(maybeConfigure),
-        ]
     }
 
     /**
@@ -297,9 +238,9 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
      * Feeds input into the terminal frontend
      */
     write (data: string) {
-        let percentageMatch = /(^|[^\d])(\d+(\.\d+)?)%([^\d]|$)/.exec(data)
+        const percentageMatch = /(^|[^\d])(\d+(\.\d+)?)%([^\d]|$)/.exec(data)
         if (percentageMatch) {
-            let percentage = percentageMatch[3] ? parseFloat(percentageMatch[2]) : parseInt(percentageMatch[2])
+            const percentage = percentageMatch[3] ? parseFloat(percentageMatch[2]) : parseInt(percentageMatch[2])
             if (percentage > 0 && percentage <= 100) {
                 this.setProgress(percentage)
                 this.logger.debug('Detected progress:', percentage)
@@ -311,7 +252,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     }
 
     paste () {
-        let data = this.electron.clipboard.readText()
+        let data = this.electron.clipboard.readText() as string
         if (this.config.store.terminal.bracketedPaste) {
             data = '\x1b[200~' + data + '\x1b[201~'
         }
@@ -362,7 +303,11 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         this.frontend.detach(this.content.nativeElement)
         this.detachTermContainerHandlers()
         this.config.enabledServices(this.decorators).forEach(decorator => {
-            decorator.detach(this)
+            try {
+                decorator.detach(this)
+            } catch (e) {
+                this.logger.warn('Decorator attach() throws', e)
+            }
         })
         this.hotkeysSubscription.unsubscribe()
         if (this.sessionCloseSubscription) {
@@ -376,6 +321,83 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         if (this.session && this.session.open) {
             await this.session.destroy()
         }
+    }
+
+    protected detachTermContainerHandlers () {
+        for (const subscription of this.termContainerSubscriptions) {
+            subscription.unsubscribe()
+        }
+        this.termContainerSubscriptions = []
+    }
+
+    protected attachTermContainerHandlers () {
+        this.detachTermContainerHandlers()
+
+        const maybeConfigure = () => {
+            if (this.hasFocus) {
+                setTimeout(() => this.configure(), 250)
+            }
+        }
+
+        this.termContainerSubscriptions = [
+            this.frontend.title$.subscribe(title => this.zone.run(() => this.setTitle(title))),
+
+            this.focused$.subscribe(() => this.frontend.enableResizing = true),
+            this.blurred$.subscribe(() => this.frontend.enableResizing = false),
+
+            this.frontend.mouseEvent$.subscribe(async event => {
+                if (event.type === 'mousedown') {
+                    if (event.which === 2) {
+                        this.paste()
+                        event.preventDefault()
+                        event.stopPropagation()
+                        return
+                    }
+                    if (event.which === 3) {
+                        if (this.config.store.terminal.rightClick === 'menu') {
+                            this.hostApp.popupContextMenu(await this.buildContextMenu())
+                        } else if (this.config.store.terminal.rightClick === 'paste') {
+                            this.paste()
+                        }
+                        event.preventDefault()
+                        event.stopPropagation()
+                        return
+                    }
+                }
+                if (event.type === 'mousewheel') {
+                    let wheelDeltaY = 0
+
+                    if ('wheelDeltaY' in event) {
+                        wheelDeltaY = (event as MouseWheelEvent)['wheelDeltaY']
+                    } else {
+                        wheelDeltaY = (event as MouseWheelEvent)['deltaY']
+                    }
+
+                    if (event.altKey) {
+                        event.preventDefault()
+                        const delta = Math.round(wheelDeltaY / 50)
+                        this.sendInput((delta > 0 ? '\u001bOA' : '\u001bOB').repeat(Math.abs(delta)))
+                    }
+                }
+            }),
+
+            this.frontend.input$.subscribe(data => {
+                this.sendInput(data)
+            }),
+
+            this.frontend.resize$.subscribe(({ columns, rows }) => {
+                this.logger.debug(`Resizing to ${columns}x${rows}`)
+                this.size = { columns, rows }
+                this.zone.run(() => {
+                    if (this.session && this.session.open) {
+                        this.session.resize(columns, rows)
+                    }
+                })
+            }),
+
+            this.hostApp.displayMetricsChanged$.subscribe(maybeConfigure),
+            this.hostApp.windowMoved$.subscribe(maybeConfigure),
+        ]
     }
 
     protected attachSessionHandlers () {

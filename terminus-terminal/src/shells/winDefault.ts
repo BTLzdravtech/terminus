@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core'
 import { HostAppService, Platform } from 'terminus-core'
 
-import { ShellProvider, IShell } from '../api'
+import { ShellProvider } from '../api/shellProvider'
+import { Shell } from '../api/interfaces'
 
 import { WSLShellProvider } from './wsl'
 import { PowerShellCoreShellProvider } from './powershellCore'
@@ -26,15 +27,15 @@ export class WindowsDefaultShellProvider extends ShellProvider {
         ]
     }
 
-    async provide (): Promise<IShell[]> {
+    async provide (): Promise<Shell[]> {
         if (this.hostApp.platform !== Platform.Windows) {
             return []
         }
         // Figure out a sensible default
-        let shellLists = await Promise.all(this.providers.map(x => x.provide()))
-        for (let list of shellLists) {
+        const shellLists = await Promise.all(this.providers.map(x => x.provide()))
+        for (const list of shellLists) {
             if (list.length) {
-                let shell = list[list.length - 1]
+                const shell = list[list.length - 1]
 
                 return [{
                     ...shell,

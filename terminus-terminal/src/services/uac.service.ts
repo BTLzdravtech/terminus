@@ -1,7 +1,7 @@
 import * as path from 'path'
 import { Injectable } from '@angular/core'
 import { ElectronService } from 'terminus-core'
-import { SessionOptions } from '../api'
+import { SessionOptions } from '../api/interfaces'
 
 import { WIN_BUILD_CONPTY_SUPPORTED, isWindowsBuild } from '../utils'
 
@@ -33,7 +33,7 @@ export class UACService {
             )
         }
 
-        let options = { ...sessionOptions }
+        const options = { ...sessionOptions }
         options.args = [options.command, ...options.args]
         options.command = helperPath
         return options

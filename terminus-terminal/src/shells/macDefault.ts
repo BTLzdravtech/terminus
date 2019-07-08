@@ -2,7 +2,8 @@ import { exec } from 'mz/child_process'
 import { Injectable } from '@angular/core'
 import { HostAppService, Platform } from 'terminus-core'
 
-import { ShellProvider, IShell } from '../api'
+import { ShellProvider } from '../api/shellProvider'
+import { Shell } from '../api/interfaces'
 
 /** @hidden */
 @Injectable()
@@ -13,11 +14,11 @@ export class MacOSDefaultShellProvider extends ShellProvider {
         super()
     }
 
-    async provide (): Promise<IShell[]> {
+    async provide (): Promise<Shell[]> {
         if (this.hostApp.platform !== Platform.macOS) {
             return []
         }
-        let shellEntry = (await exec(`/usr/bin/dscl . -read /Users/${process.env.LOGNAME} UserShell`))[0].toString()
+        const shellEntry = (await exec(`/usr/bin/dscl . -read /Users/${process.env.LOGNAME} UserShell`))[0].toString()
         return [{
             id: 'default',
             name: 'User default',

@@ -5,9 +5,11 @@ import { Injectable } from '@angular/core'
 import { ElectronService } from './electron.service'
 import { HostAppService, Platform } from './hostApp.service'
 
+/* eslint-disable block-scoped-var */
+
 try {
-    var wnr = require('windows-native-registry') // tslint:disable-line
-} catch (_) { } // tslint:disable-line
+    var wnr = require('windows-native-registry') // eslint-disable-line @typescript-eslint/no-var-requires
+} catch (_) { }
 
 @Injectable({ providedIn: 'root' })
 export class ShellIntegrationService {
@@ -17,11 +19,11 @@ export class ShellIntegrationService {
     private registryKeys = [
         {
             path: 'Software\\Classes\\Directory\\Background\\shell\\Open Terminus here',
-            command: 'open "%V"'
+            command: 'open "%V"',
         },
         {
             path: 'Software\\Classes\\*\\shell\\Paste path into Terminus',
-            command: 'paste "%V"'
+            command: 'paste "%V"',
         },
     ]
     constructor (
@@ -40,15 +42,6 @@ export class ShellIntegrationService {
         this.updatePaths()
     }
 
-    private async updatePaths (): Promise<void> {
-        // Update paths in case of an update
-        if (this.hostApp.platform === Platform.Windows) {
-            if (await this.isInstalled()) {
-                await this.install()
-            }
-        }
-    }
-
     async isInstalled (): Promise<boolean> {
         if (this.hostApp.platform === Platform.macOS) {
             return fs.exists(path.join(this.automatorWorkflowsDestination, this.automatorWorkflows[0]))
@@ -59,13 +52,13 @@ export class ShellIntegrationService {
     }
 
     async install () {
-        const exe = process.env.PORTABLE_EXECUTABLE_FILE || this.electron.app.getPath('exe')
+        const exe: string = process.env.PORTABLE_EXECUTABLE_FILE || this.electron.app.getPath('exe')
         if (this.hostApp.platform === Platform.macOS) {
-            for (let wf of this.automatorWorkflows) {
+            for (const wf of this.automatorWorkflows) {
                 await exec(`cp -r "${this.automatorWorkflowsLocation}/${wf}" "${this.automatorWorkflowsDestination}"`)
             }
         } else if (this.hostApp.platform === Platform.Windows) {
-            for (let registryKey of this.registryKeys) {
+            for (const registryKey of this.registryKeys) {
                 wnr.createRegistryKey(wnr.HK.CU, registryKey.path)
                 wnr.createRegistryKey(wnr.HK.CU, registryKey.path + '\\command')
                 wnr.setRegistryValue(wnr.HK.CU, registryKey.path, 'Icon', wnr.REG.SZ, exe)
@@ -76,12 +69,21 @@ export class ShellIntegrationService {
 
     async remove () {
         if (this.hostApp.platform === Platform.macOS) {
-            for (let wf of this.automatorWorkflows) {
+            for (const wf of this.automatorWorkflows) {
                 await exec(`rm -rf "${this.automatorWorkflowsDestination}/${wf}"`)
             }
         } else if (this.hostApp.platform === Platform.Windows) {
-            for (let registryKey of this.registryKeys) {
+            for (const registryKey of this.registryKeys) {
                 wnr.deleteRegistryKey(wnr.HK.CU, registryKey.path)
+            }
+        }
+    }
+
+    private async updatePaths (): Promise<void> {
+        // Update paths in case of an update
+        if (this.hostApp.platform === Platform.Windows) {
+            if (await this.isInstalled()) {
+                await this.install()
             }
         }
     }

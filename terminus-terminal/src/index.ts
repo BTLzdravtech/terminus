@@ -17,7 +17,7 @@ import { TerminalSettingsTabComponent } from './components/terminalSettingsTab.c
 import { ColorPickerComponent } from './components/colorPicker.component'
 import { EditProfileModalComponent } from './components/editProfileModal.component'
 import { EnvironmentEditorComponent } from './components/environmentEditor.component'
-import { BaseTerminalTabComponent } from './components/baseTerminalTab.component'
+import { SearchPanelComponent } from './components/searchPanel.component'
 
 import { BaseSession } from './services/sessions.service'
 import { TerminalFrontendService } from './services/terminalFrontend.service'
@@ -26,7 +26,10 @@ import { DockMenuService } from './services/dockMenu.service'
 
 import { ButtonProvider } from './buttonProvider'
 import { RecoveryProvider } from './recoveryProvider'
-import { TerminalColorSchemeProvider, TerminalDecorator, ShellProvider, TerminalContextMenuItemProvider } from './api'
+import { TerminalDecorator } from './api/decorator'
+import { TerminalContextMenuItemProvider } from './api/contextMenuProvider'
+import { TerminalColorSchemeProvider } from './api/colorSchemeProvider'
+import { ShellProvider } from './api/shellProvider'
 import { TerminalSettingsTabProvider, AppearanceSettingsTabProvider, ShellSettingsTabProvider } from './settings'
 import { PathDropDecorator } from './pathDrop'
 import { TerminalConfigProvider } from './config'
@@ -51,7 +54,7 @@ import { WSLShellProvider } from './shells/wsl'
 import { hterm } from './frontends/hterm'
 import { Frontend } from './frontends/frontend'
 import { HTermFrontend } from './frontends/htermFrontend'
-import { XTermFrontend } from './frontends/xtermFrontend'
+import { XTermFrontend, XTermWebGLFrontend } from './frontends/xtermFrontend'
 
 /** @hidden */
 @NgModule({
@@ -95,7 +98,7 @@ import { XTermFrontend } from './frontends/xtermFrontend'
         // For WindowsDefaultShellProvider
         PowerShellCoreShellProvider,
         WSLShellProvider,
-        WindowsStockShellsProvider
+        WindowsStockShellsProvider,
     ],
     entryComponents: [
         TerminalTabComponent,
@@ -103,7 +106,7 @@ import { XTermFrontend } from './frontends/xtermFrontend'
         ShellSettingsTabComponent,
         TerminalSettingsTabComponent,
         EditProfileModalComponent,
-    ],
+    ] as any[],
     declarations: [
         ColorPickerComponent,
         TerminalTabComponent,
@@ -112,13 +115,14 @@ import { XTermFrontend } from './frontends/xtermFrontend'
         TerminalSettingsTabComponent,
         EditProfileModalComponent,
         EnvironmentEditorComponent,
-    ],
+        SearchPanelComponent,
+    ] as any[],
     exports: [
         ColorPickerComponent,
         EnvironmentEditorComponent,
     ],
 })
-export default class TerminalModule {
+export default class TerminalModule { // eslint-disable-line @typescript-eslint/no-extraneous-class
     constructor (
         app: AppService,
         config: ConfigService,
@@ -127,7 +131,7 @@ export default class TerminalModule {
         hostApp: HostAppService,
         dockMenu: DockMenuService,
     ) {
-        let events = [
+        const events = [
             {
                 name: 'keydown',
                 htermHandler: 'onKeyDown_',
@@ -138,7 +142,7 @@ export default class TerminalModule {
             },
         ]
         events.forEach((event) => {
-            let oldHandler = hterm.hterm.Keyboard.prototype[event.htermHandler]
+            const oldHandler = hterm.hterm.Keyboard.prototype[event.htermHandler]
             hterm.hterm.Keyboard.prototype[event.htermHandler] = function (nativeEvent) {
                 hotkeys.pushKeystroke(event.name, nativeEvent)
                 if (hotkeys.getCurrentPartiallyMatchedHotkeys().length === 0) {
@@ -165,8 +169,8 @@ export default class TerminalModule {
                 hostApp.newWindow()
             }
             if (hotkey.startsWith('profile.')) {
-                let profiles = await terminal.getProfiles()
-                let profile = profiles.find(x => slug(x.name).toLowerCase() === hotkey.split('.')[1])
+                const profiles = await terminal.getProfiles()
+                const profile = profiles.find(x => slug(x.name).toLowerCase() === hotkey.split('.')[1])
                 if (profile) {
                     terminal.openTabWithOptions(profile.sessionOptions)
                 }
@@ -195,13 +199,13 @@ export default class TerminalModule {
 
         hostApp.cliPaste$.subscribe(text => {
             if (app.activeTab instanceof TerminalTabComponent && app.activeTab.session) {
-                (app.activeTab as TerminalTabComponent).sendInput(text)
+                app.activeTab.sendInput(text)
                 hostApp.bringToFront()
             }
         })
 
         hostApp.cliOpenProfile$.subscribe(async profileName => {
-            let profile = config.store.terminal.profiles.find(x => x.name === profileName)
+            const profile = config.store.terminal.profiles.find(x => x.name === profileName)
             if (!profile) {
                 console.error('Requested profile', profileName, 'not found')
                 return
@@ -214,6 +218,10 @@ export default class TerminalModule {
     }
 }
 
-export { TerminalService, BaseSession, TerminalTabComponent, TerminalFrontendService, BaseTerminalTabComponent }
-export { Frontend, XTermFrontend, HTermFrontend }
-export * from './api'
+export { TerminalService, BaseSession, TerminalTabComponent, TerminalFrontendService, TerminalDecorator, TerminalContextMenuItemProvider, TerminalColorSchemeProvider, ShellProvider }
+export { Frontend, XTermFrontend, XTermWebGLFrontend, HTermFrontend }
+export { BaseTerminalTabComponent } from './api/baseTerminalTab.component'
+export * from './api/interfaces'
+
+// Deprecations
+export { TerminalColorScheme as ITerminalColorScheme, Shell as IShell } from './api/interfaces'

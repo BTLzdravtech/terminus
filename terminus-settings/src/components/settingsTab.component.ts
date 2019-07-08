@@ -1,19 +1,19 @@
 import * as yaml from 'js-yaml'
 import * as os from 'os'
 import { Subscription } from 'rxjs'
-import { Component, Inject, Input, HostBinding } from '@angular/core'
+import { Component, Inject, Input, HostBinding, NgZone } from '@angular/core'
 import {
     ElectronService,
     DockingService,
     ConfigService,
-    IHotkeyDescription,
+    HotkeyDescription,
     HotkeysService,
     BaseTabComponent,
     Theme,
     HostAppService,
     Platform,
     HomeBaseService,
-    ShellIntegrationService
+    ShellIntegrationService,
 } from 'terminus-core'
 
 import { SettingsTabProvider } from '../api'
@@ -30,7 +30,7 @@ import { SettingsTabProvider } from '../api'
 export class SettingsTabComponent extends BaseTabComponent {
     @Input() activeTab: string
     hotkeyFilter = ''
-    hotkeyDescriptions: IHotkeyDescription[]
+    hotkeyDescriptions: HotkeyDescription[]
     screens: any[]
     Platform = Platform
     configDefaults: any
@@ -47,6 +47,7 @@ export class SettingsTabComponent extends BaseTabComponent {
         public hostApp: HostAppService,
         public homeBase: HomeBaseService,
         public shellIntegration: ShellIntegrationService,
+        public zone: NgZone,
         hotkeys: HotkeysService,
         @Inject(SettingsTabProvider) public settingsProviders: SettingsTabProvider[],
         @Inject(Theme) public themes: Theme[],
@@ -67,6 +68,14 @@ export class SettingsTabComponent extends BaseTabComponent {
 
         this.configSubscription = config.changed$.subscribe(onConfigChange)
         onConfigChange()
+
+        const onScreenChange = () => {
+            this.zone.run(() => this.screens = this.docking.getScreens());
+        }
+
+        electron.screen.on('display-added', onScreenChange);
+        electron.screen.on('display-removed', onScreenChange);
+        electron.screen.on('display-metrics-changed', onScreenChange);
 
         hotkeys.getHotkeyDescriptions().then(descriptions => {
             this.hotkeyDescriptions = descriptions
@@ -124,7 +133,7 @@ export class SettingsTabComponent extends BaseTabComponent {
 
     getHotkey (id: string) {
         let ptr = this.config.store.hotkeys
-        for (let token of id.split(/\./g)) {
+        for (const token of id.split(/\./g)) {
             ptr = ptr[token]
         }
         return ptr
@@ -133,7 +142,7 @@ export class SettingsTabComponent extends BaseTabComponent {
     setHotkey (id: string, value) {
         let ptr = this.config.store
         let prop = 'hotkeys'
-        for (let token of id.split(/\./g)) {
+        for (const token of id.split(/\./g)) {
             ptr = ptr[prop]
             prop = token
         }

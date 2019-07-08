@@ -1,7 +1,7 @@
 import { Component } from '@angular/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { ConfigService, ElectronService, HostAppService } from 'terminus-core'
-import { SSHConnection, ISSHConnectionGroup } from '../api'
+import { SSHConnection, SSHConnectionGroup } from '../api'
 import { EditConnectionModalComponent } from './editConnectionModal.component'
 import { PromptModalComponent } from './promptModal.component'
 
@@ -11,7 +11,7 @@ import { PromptModalComponent } from './promptModal.component'
 })
 export class SSHSettingsTabComponent {
     connections: SSHConnection[]
-    childGroups: ISSHConnectionGroup[]
+    childGroups: SSHConnectionGroup[]
     groupCollapsed: {[id: string]: boolean} = {}
 
     constructor (
@@ -25,14 +25,14 @@ export class SSHSettingsTabComponent {
     }
 
     createConnection () {
-        let connection: SSHConnection = {
+        const connection: SSHConnection = {
             name: '',
             host: '',
             port: 22,
             user: 'root',
         }
 
-        let modal = this.ngbModal.open(EditConnectionModalComponent)
+        const modal = this.ngbModal.open(EditConnectionModalComponent)
         modal.componentInstance.connection = connection
         modal.result.then(result => {
             this.connections.push(result)
@@ -43,7 +43,7 @@ export class SSHSettingsTabComponent {
     }
 
     editConnection (connection: SSHConnection) {
-        let modal = this.ngbModal.open(EditConnectionModalComponent)
+        const modal = this.ngbModal.open(EditConnectionModalComponent, { size: 'lg' })
         modal.componentInstance.connection = Object.assign({}, connection)
         modal.result.then(result => {
             Object.assign(connection, result)
@@ -70,14 +70,14 @@ export class SSHSettingsTabComponent {
         }
     }
 
-    editGroup (group: ISSHConnectionGroup) {
-        let modal = this.ngbModal.open(PromptModalComponent)
+    editGroup (group: SSHConnectionGroup) {
+        const modal = this.ngbModal.open(PromptModalComponent)
         modal.componentInstance.prompt = 'New group name'
         modal.componentInstance.value = group.name
         modal.result.then(result => {
             if (result) {
-                for (let connection of this.connections.filter(x => x.group === group.name)) {
-                    connection.group = result
+                for (const connection of this.connections.filter(x => x.group === group.name)) {
+                    connection.group = result.value
                 }
                 this.config.store.ssh.connections = this.connections
                 this.config.save()
@@ -86,7 +86,7 @@ export class SSHSettingsTabComponent {
         })
     }
 
-    async deleteGroup (group: ISSHConnectionGroup) {
+    async deleteGroup (group: SSHConnectionGroup) {
         if ((await this.electron.showMessageBox(
             this.hostApp.getWindow(),
             {
@@ -96,7 +96,7 @@ export class SSHSettingsTabComponent {
                 defaultId: 1,
             }
         )).response === 1) {
-            for (let connection of this.connections.filter(x => x.group === group.name)) {
+            for (const connection of this.connections.filter(x => x.group === group.name)) {
                 connection.group = null
             }
             this.config.save()
@@ -108,7 +108,7 @@ export class SSHSettingsTabComponent {
         this.connections = this.config.store.ssh.connections
         this.childGroups = []
 
-        for (let connection of this.connections) {
+        for (const connection of this.connections) {
             connection.group = connection.group || null
             let group = this.childGroups.find(x => x.name === connection.group)
             if (!group) {

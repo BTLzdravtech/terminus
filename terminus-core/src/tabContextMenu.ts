@@ -22,31 +22,31 @@ export class CloseContextMenu extends TabContextMenuItemProvider {
                 label: 'Close',
                 click: () => this.zone.run(() => {
                     this.app.closeTab(tab, true)
-                })
+                }),
             },
             {
                 label: 'Close other tabs',
                 click: () => this.zone.run(() => {
-                    for (let t of this.app.tabs.filter(x => x !== tab)) {
+                    for (const t of this.app.tabs.filter(x => x !== tab)) {
                         this.app.closeTab(t, true)
                     }
-                })
+                }),
             },
             {
                 label: 'Close tabs to the right',
                 click: () => this.zone.run(() => {
-                    for (let t of this.app.tabs.slice(this.app.tabs.indexOf(tab) + 1)) {
+                    for (const t of this.app.tabs.slice(this.app.tabs.indexOf(tab) + 1)) {
                         this.app.closeTab(t, true)
                     }
-                })
+                }),
             },
             {
                 label: 'Close tabs to the left',
                 click: () => this.zone.run(() => {
-                    for (let t of this.app.tabs.slice(0, this.app.tabs.indexOf(tab))) {
+                    for (const t of this.app.tabs.slice(0, this.app.tabs.indexOf(tab))) {
                         this.app.closeTab(t, true)
                     }
-                })
+                }),
             },
         ]
     }
@@ -78,11 +78,11 @@ export class CommonOptionsContextMenu extends TabContextMenuItemProvider {
         return [
             {
                 label: 'Rename',
-                click: () => this.zone.run(() => tabHeader.showRenameTabModal())
+                click: () => this.zone.run(() => tabHeader.showRenameTabModal()),
             },
             {
                 label: 'Duplicate',
-                click: () => this.zone.run(() => this.app.duplicateTab(tab))
+                click: () => this.zone.run(() => this.app.duplicateTab(tab)),
             },
             {
                 label: 'Color',
@@ -95,7 +95,7 @@ export class CommonOptionsContextMenu extends TabContextMenuItemProvider {
                         tab.color = color.value
                     }),
                 })) as Electron.MenuItemConstructorOptions[],
-            }
+            },
         ]
     }
 }
@@ -111,7 +111,7 @@ export class TaskCompletionContextMenu extends TabContextMenuItemProvider {
     }
 
     async getItems (tab: BaseTabComponent): Promise<Electron.MenuItemConstructorOptions[]> {
-        let process = await tab.getCurrentProcess()
+        const process = await tab.getCurrentProcess()
         if (process) {
             return [
                 {
@@ -138,7 +138,7 @@ export class TaskCompletionContextMenu extends TabContextMenuItemProvider {
                         } else {
                             this.app.stopObservingTabCompletion(tab)
                         }
-                    })
+                    }),
                 },
             ]
         }

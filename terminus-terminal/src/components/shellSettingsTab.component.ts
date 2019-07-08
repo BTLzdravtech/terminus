@@ -4,7 +4,7 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { Subscription } from 'rxjs'
 import { ConfigService, ElectronService, HostAppService, Platform } from 'terminus-core'
 import { EditProfileModalComponent } from './editProfileModal.component'
-import { IShell, Profile } from '../api'
+import { Shell, Profile } from '../api/interfaces'
 import { TerminalService } from '../services/terminal.service'
 import { WIN_BUILD_CONPTY_SUPPORTED, WIN_BUILD_CONPTY_STABLE, isWindowsBuild } from '../utils'
 
@@ -13,7 +13,7 @@ import { WIN_BUILD_CONPTY_SUPPORTED, WIN_BUILD_CONPTY_STABLE, isWindowsBuild } f
     template: require('./shellSettingsTab.component.pug'),
 })
 export class ShellSettingsTabComponent {
-    shells: IShell[] = []
+    shells: Shell[] = []
     profiles: Profile[] = []
     Platform = Platform
     isConPTYAvailable: boolean
@@ -51,8 +51,8 @@ export class ShellSettingsTabComponent {
     }
 
     pickWorkingDirectory () {
-        let shell = this.shells.find(x => x.id === this.config.store.terminal.shell)
-        let paths = this.electron.dialog.showOpenDialog(
+        const shell = this.shells.find(x => x.id === this.config.store.terminal.shell)
+        const paths = this.electron.dialog.showOpenDialog(
             this.hostApp.getWindow(),
             {
                 defaultPath: shell.fsBase,
@@ -64,8 +64,8 @@ export class ShellSettingsTabComponent {
         }
     }
 
-    newProfile (shell: IShell) {
-        let profile: Profile = {
+    newProfile (shell: Shell) {
+        const profile: Profile = {
             name: shell.name,
             sessionOptions: this.terminalService.optionsFromShell(shell),
         }
@@ -75,7 +75,7 @@ export class ShellSettingsTabComponent {
     }
 
     editProfile (profile: Profile) {
-        let modal = this.ngbModal.open(EditProfileModalComponent)
+        const modal = this.ngbModal.open(EditProfileModalComponent)
         modal.componentInstance.profile = Object.assign({}, profile)
         modal.result.then(result => {
             Object.assign(profile, result)

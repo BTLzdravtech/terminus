@@ -1,6 +1,12 @@
 import { Observable, Subject, AsyncSubject, ReplaySubject, BehaviorSubject } from 'rxjs'
-import { ResizeEvent } from '../api'
+import { ResizeEvent } from '../api/interfaces'
 import { ConfigService, ThemesService, HotkeysService } from 'terminus-core'
+
+export interface SearchOptions {
+    regex?: boolean
+    wholeWord?: boolean
+    caseSensitive?: boolean
+}
 
 /**
  * Extend to add support for a different VT frontend implementation
@@ -33,11 +39,8 @@ export abstract class Frontend {
     get dragOver$ (): Observable<DragEvent> { return this.dragOver }
     get drop$ (): Observable<DragEvent> { return this.drop }
 
-    abstract attach (host: HTMLElement): void
-    detach (host: HTMLElement): void { } // tslint:disable-line
-
     destroy (): void {
-        for (let o of [
+        for (const o of [
             this.ready,
             this.title,
             this.alternateScreenActive,
@@ -53,6 +56,9 @@ export abstract class Frontend {
         }
     }
 
+    abstract attach (host: HTMLElement): void
+    detach (host: HTMLElement): void { } // eslint-disable-line
+
     abstract getSelection (): string
     abstract copySelection (): void
     abstract clearSelection (): void
@@ -64,4 +70,7 @@ export abstract class Frontend {
 
     abstract configure (): void
     abstract setZoom (zoom: number): void
+
+    abstract findNext (term: string, searchOptions?: SearchOptions): boolean
+    abstract findPrevious (term: string, searchOptions?: SearchOptions): boolean
 }

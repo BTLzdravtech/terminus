@@ -3,7 +3,8 @@ import slug from 'slug'
 import { Injectable } from '@angular/core'
 import { HostAppService, Platform } from 'terminus-core'
 
-import { ShellProvider, IShell } from '../api'
+import { ShellProvider } from '../api/shellProvider'
+import { Shell } from '../api/interfaces'
 
 /** @hidden */
 @Injectable()
@@ -14,7 +15,7 @@ export class POSIXShellsProvider extends ShellProvider {
         super()
     }
 
-    async provide (): Promise<IShell[]> {
+    async provide (): Promise<Shell[]> {
         if (this.hostApp.platform === Platform.Windows) {
             return []
         }

@@ -9,19 +9,17 @@ import { SSHConnection, SSHSession } from '../api'
 import { PromptModalComponent } from '../components/promptModal.component'
 import { SSHTabComponent } from '../components/sshTab.component'
 import { PasswordStorageService } from './passwordStorage.service'
-const { SSH2Stream } = require('ssh2-streams')
+import { SSH2Stream } from 'ssh2-streams'
 
-let windowsProcessTree
 try {
-    windowsProcessTree = require('windows-process-tree/build/Release/windows_process_tree.node')
-} catch (e) {
-} // tslint:disable-line
+    var windowsProcessTree = require('@terminus-term/windows-process-tree')  // eslint-disable-line @typescript-eslint/no-var-requires
+} catch { }
 
 @Injectable({ providedIn: 'root' })
 export class SSHService {
     private logger: Logger
 
-    constructor (
+    private constructor (
         log: LogService,
         private app: AppService,
         private zone: NgZone,
@@ -46,16 +44,16 @@ export class SSHService {
         let privateKeyPath = session.connection.privateKey
 
         if (!logCallback) {
-            logCallback = (s) => null
+            logCallback = () => null
         }
 
-        const log = s => {
+        const log = (s: any) => {
             logCallback(s)
             this.logger.info(s)
         }
 
         if (!privateKeyPath) {
-            let userKeyPath = path.join(process.env.HOME, '.ssh', 'id_rsa')
+            const userKeyPath = path.join(process.env.HOME, '.ssh', 'id_rsa')
             if (await fs.exists(userKeyPath)) {
                 log(`Using user's default private key: ${userKeyPath}`)
                 privateKeyPath = userKeyPath
@@ -67,7 +65,7 @@ export class SSHService {
                 privateKey = (await fs.readFile(privateKeyPath)).toString()
             } catch (error) {
                 log('Could not read the private key file')
-                this.toastr.warning('Could not read the private key file')
+                this.toastr.error('Could not read the private key file')
             }
 
             if (privateKey) {
@@ -78,18 +76,21 @@ export class SSHService {
                     encrypted = encrypted || privateKey.includes('Encryption:') && !privateKey.includes('Encryption: none')
                 }
                 if (encrypted) {
-                    let modal = this.ngbModal.open(PromptModalComponent)
+                    const modal = this.ngbModal.open(PromptModalComponent)
                     log('Key requires passphrase')
                     modal.componentInstance.prompt = 'Private key passphrase'
                     modal.componentInstance.password = true
                     try {
-                        privateKeyPassphrase = await modal.result
-                    } catch (_err) { } // tslint:disable-line
+                        const result  = await modal.result
+                        if (result) {
+                            privateKeyPassphrase = result.value
+                        }
+                    } catch (e) { }
                 }
             }
         }
 
-        let ssh = new Client()
+        const ssh = new Client()
         let connected = false
         let savedPassword: string = null
         await new Promise(async (resolve, reject) => {
@@ -101,7 +102,9 @@ export class SSHService {
                 this.zone.run(resolve)
             })
             ssh.on('error', error => {
-                this.passwordStorage.deletePassword(session.connection)
+                if (error.message === 'All configured authentication methods failed') {
+                    this.passwordStorage.deletePassword(session.connection)
+                }
                 this.zone.run(() => {
                     if (connected) {
                         this.toastr.error(error.toString())
@@ -113,12 +116,13 @@ export class SSHService {
             ssh.on('keyboard-interactive', (name, instructions, instructionsLang, prompts, finish) => this.zone.run(async () => {
                 log(`Keyboard-interactive auth requested: ${name}`)
                 this.logger.info('Keyboard-interactive auth:', name, instructions, instructionsLang)
-                let results = []
-                for (let prompt of prompts) {
-                    let modal = this.ngbModal.open(PromptModalComponent)
+                const results = []
+                for (const prompt of prompts) {
+                    const modal = this.ngbModal.open(PromptModalComponent)
                     modal.componentInstance.prompt = prompt.prompt
                     modal.componentInstance.password = !prompt.echo
-                    results.push(await modal.result)
+                    const result = await modal.result
+                    results.push(result ? result.value : '')
                 }
                 finish(results)
             }))
@@ -133,7 +137,7 @@ export class SSHService {
 
             let agent: string = null
             if (this.hostApp.platform === Platform.Windows) {
-                let pageantRunning = new Promise<boolean>(resolve => {
+                const pageantRunning = new Promise<boolean>(resolve => {
                     windowsProcessTree.getProcessList(list => {
                         resolve(list.some(x => x.name === 'pageant.exe'))
                     }, 0)
@@ -180,7 +184,7 @@ export class SSHService {
                 }
 
                 if (!keychainPasswordUsed) {
-                    let password = await this.passwordStorage.loadPassword(session.connection)
+                    const password = await this.passwordStorage.loadPassword(session.connection)
                     if (password) {
                         log('Trying saved password')
                         keychainPasswordUsed = true
@@ -188,20 +192,27 @@ export class SSHService {
                     }
                 }
 
-                let modal = this.ngbModal.open(PromptModalComponent)
+                const modal = this.ngbModal.open(PromptModalComponent)
                 modal.componentInstance.prompt = `Password for ${session.connection.user}@${session.connection.host}`
                 modal.componentInstance.password = true
+                modal.componentInstance.showRememberCheckbox = true
                 try {
-                    savedPassword = await modal.result
+                    const result = await modal.result
+                    if (result) {
+                        if (result.remember) {
+                            savedPassword = result.value
+                        }
+                        return result.value
+                    }
+                    return ''
                 } catch (_) {
                     return ''
                 }
-                return savedPassword
             })
         })
 
         try {
-            let shell: any = await new Promise<any>((resolve, reject) => {
+            const shell: any = await new Promise<any>((resolve, reject) => {
                 ssh.shell({ term: 'xterm-256color' }, (err, shell) => {
                     if (err) {
                         reject(err)
@@ -214,11 +225,11 @@ export class SSHService {
             session.shell = shell
 
             shell.on('greeting', greeting => {
-                log('Shell Greeting: ' + greeting)
+                log(`Shell Greeting: ${greeting}`)
             })
 
             shell.on('banner', banner => {
-                log('Shell Banner: ' + banner)
+                log(`Shell Banner: ${banner}`)
             })
         } catch (error) {
             this.toastr.error(error.message)
@@ -227,7 +238,8 @@ export class SSHService {
     }
 }
 
+/* eslint-disable */
 const _authPassword = SSH2Stream.prototype.authPassword
-SSH2Stream.prototype.authPassword = async function (username, passwordFn) {
+SSH2Stream.prototype.authPassword = async function (username, passwordFn: any) {
     _authPassword.bind(this)(username, await passwordFn())
-}
+} as any

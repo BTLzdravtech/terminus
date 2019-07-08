@@ -4,7 +4,7 @@ import { ToastrService } from 'ngx-toastr'
 import { ConfigService, AppService } from 'terminus-core'
 import { SettingsTabComponent } from 'terminus-settings'
 import { SSHService } from '../services/ssh.service'
-import { SSHConnection, ISSHConnectionGroup } from '../api'
+import { SSHConnection, SSHConnectionGroup } from '../api'
 
 /** @hidden */
 @Component({
@@ -13,10 +13,10 @@ import { SSHConnection, ISSHConnectionGroup } from '../api'
 })
 export class SSHModalComponent {
     connections: SSHConnection[]
-    childFolders: ISSHConnectionGroup[]
+    childFolders: SSHConnectionGroup[]
     quickTarget: string
     lastConnection: SSHConnection
-    childGroups: ISSHConnectionGroup[]
+    childGroups: SSHConnectionGroup[]
     groupCollapsed: {[id: string]: boolean} = {}
 
     constructor (
@@ -47,9 +47,11 @@ export class SSHModalComponent {
             host = host.split(':')[0]
         }
 
-        let connection: SSHConnection = {
+        const connection: SSHConnection = {
             name: this.quickTarget,
-            host, user, port
+            host,
+            user,
+            port,
         }
         window.localStorage.lastConnection = JSON.stringify(connection)
         this.connect(connection)
@@ -88,7 +90,7 @@ export class SSHModalComponent {
             connections = connections.filter(connection => (connection.name + connection.group).toLowerCase().includes(this.quickTarget))
         }
 
-        for (let connection of connections) {
+        for (const connection of connections) {
             connection.group = connection.group || null
             let group = this.childGroups.find(x => x.name === connection.group)
             if (!group) {

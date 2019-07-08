@@ -3,8 +3,8 @@ import { ToastrService } from 'ngx-toastr'
 import { ConfigService } from 'terminus-core'
 import { UACService } from './services/uac.service'
 import { TerminalService } from './services/terminal.service'
-import { BaseTerminalTabComponent } from './components/baseTerminalTab.component'
-import { TerminalContextMenuItemProvider } from './api'
+import { TerminalContextMenuItemProvider } from './api/contextMenuProvider'
+import { BaseTerminalTabComponent } from './api/baseTerminalTab.component'
 
 /** @hidden */
 @Injectable()
@@ -21,14 +21,14 @@ export class NewTabContextMenu extends TerminalContextMenuItemProvider {
     }
 
     async getItems (tab: BaseTerminalTabComponent): Promise<Electron.MenuItemConstructorOptions[]> {
-        let profiles = await this.terminalService.getProfiles()
+        const profiles = await this.terminalService.getProfiles()
 
-        let items: Electron.MenuItemConstructorOptions[] = [
+        const items: Electron.MenuItemConstructorOptions[] = [
             {
                 label: 'New terminal',
                 click: () => this.zone.run(() => {
                     this.terminalService.openTabWithOptions((tab as any).sessionOptions)
-                })
+                }),
             },
             {
                 label: 'New with profile',
@@ -37,7 +37,7 @@ export class NewTabContextMenu extends TerminalContextMenuItemProvider {
                     click: () => this.zone.run(async () => {
                         this.terminalService.openTab(profile, await tab.session.getWorkingDirectory())
                     }),
-                }))
+                })),
             },
         ]
 
@@ -49,7 +49,7 @@ export class NewTabContextMenu extends TerminalContextMenuItemProvider {
                     click: () => this.zone.run(async () => {
                         this.terminalService.openTabWithOptions({
                             ...profile.sessionOptions,
-                            runAsAdministrator: true
+                            runAsAdministrator: true,
                         })
                     }),
                 })),
@@ -83,13 +83,13 @@ export class CopyPasteContextMenu extends TerminalContextMenuItemProvider {
                             this.toastr.info('Copied')
                         })
                     })
-                }
+                },
             },
             {
                 label: 'Paste',
                 click: () => {
                     this.zone.run(() => tab.paste())
-                }
+                },
             },
         ]
     }

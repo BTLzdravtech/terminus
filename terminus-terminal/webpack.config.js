@@ -4,7 +4,7 @@ const webpack = require('webpack')
 module.exports = {
   target: 'node',
   entry: 'src/index.ts',
-  devtool: 'eval-source-map',
+  devtool: 'source-map',
   context: __dirname,
   output: {
     path: path.resolve(__dirname, 'dist'),
@@ -18,7 +18,7 @@ module.exports = {
     minimize: false,
   },
   resolve: {
-    modules: ['.', 'src', 'node_modules', '../app/node_modules'].map(x => path.join(__dirname, x)),
+    modules: ['.', 'src', 'node_modules', '../app/node_modules', 'node_modules/xterm/src'].map(x => path.join(__dirname, x)),
     extensions: ['.ts', '.js'],
   },
   module: {
@@ -32,7 +32,10 @@ module.exports = {
             typeRoots: [path.resolve(__dirname, 'node_modules/@types')],
             paths: {
               "terminus-*": [path.resolve(__dirname, '../terminus-*')],
-              "*": [path.resolve(__dirname, '../app/node_modules/*')],
+              "*": [
+                path.resolve(__dirname, '../app/node_modules/*'),
+                path.resolve(__dirname, './node_modules/xterm/src/*')
+              ],
             }
           },
         },
@@ -53,14 +56,13 @@ module.exports = {
     ]
   },
   externals: [
+    'child_process',
     'electron',
     'fontmanager-redux',
     'fs',
     'path',
     'macos-native-processlist',
     'windows-native-registry',
-    'mz/fs',
-    'mz/child_process',
     'node-pty',
     '@terminus-term/windows-process-tree',
     'os',

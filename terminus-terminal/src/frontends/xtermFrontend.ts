@@ -1,28 +1,40 @@
-import { Frontend } from './frontend'
+import { Frontend, SearchOptions } from './frontend'
 import { Terminal, ITheme } from 'xterm'
-import { fit } from 'xterm/src/addons/fit/fit'
+import { getCSSFontFamily } from '../utils'
+import { FitAddon } from 'xterm-addon-fit'
 import { enableLigatures } from 'xterm-addon-ligatures'
-import 'xterm/lib/xterm.css'
+import { SearchAddon } from 'xterm-addon-search'
+import { WebglAddon } from 'xterm-addon-webgl'
 import './xterm.css'
-import deepEqual = require('deep-equal')
+import deepEqual from 'deep-equal'
+import { Attributes } from 'xterm/src/common/buffer/Constants'
+import { AttributeData } from 'xterm/src/common/buffer/AttributeData'
+import { CellData } from 'xterm/src/common/buffer/CellData'
+
+const COLOR_NAMES = [
+    'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white',
+    'brightBlack', 'brightRed', 'brightGreen', 'brightYellow', 'brightBlue', 'brightMagenta', 'brightCyan', 'brightWhite',
+]
 
 /** @hidden */
 export class XTermFrontend extends Frontend {
     enableResizing = true
-    xterm: Terminal
-    xtermCore: any
+    protected xtermCore: any
+    protected enableWebGL = false
+    private xterm: Terminal
     private configuredFontSize = 0
     private zoom = 0
     private resizeHandler: () => void
     private configuredTheme: ITheme = {}
     private copyOnSelect = false
+    private search = new SearchAddon()
+    private fitAddon = new FitAddon()
+    private opened = false
 
     constructor () {
         super()
         this.xterm = new Terminal({
             allowTransparency: true,
-            enableBold: true,
-            experimentalCharAtlas: 'dynamic',
         })
         this.xtermCore = (this.xterm as any)._core
 
@@ -40,6 +52,7 @@ export class XTermFrontend extends Frontend {
                 this.copySelection()
             }
         })
+        this.xterm.loadAddon(this.fitAddon)
 
         const keyboardEventHandler = (name: string, event: KeyboardEvent) => {
             this.hotkeysService.pushKeystroke(name, event)
@@ -56,7 +69,7 @@ export class XTermFrontend extends Frontend {
         }
 
         this.xterm.attachCustomKeyEventHandler((event: KeyboardEvent) => {
-            if ((event.getModifierState('Control') || event.getModifierState('Meta')) && event.key.toLowerCase() === 'v') {
+            if (event.getModifierState('Meta') && event.key.toLowerCase() === 'v') {
                 event.preventDefault()
                 return false
             }
@@ -72,9 +85,10 @@ export class XTermFrontend extends Frontend {
 
         this.resizeHandler = () => {
             try {
-                fit(this.xterm)
-            } catch {
+                this.fitAddon.fit()
+            } catch (e) {
                 // tends to throw when element wasn't shown yet
+                console.warn('Could not resize xterm', e)
             }
         }
 
@@ -86,8 +100,20 @@ export class XTermFrontend extends Frontend {
 
     attach (host: HTMLElement): void {
         this.xterm.open(host)
+        this.opened = true
+
+        if (this.enableWebGL) {
+            this.xterm.loadAddon(new WebglAddon())
+        }
+
+        if (this.configService.store.terminal.ligatures) {
+            enableLigatures(this.xterm)
+        }
+
         this.ready.next(null)
         this.ready.complete()
+
+        this.xterm.loadAddon(this.search)
 
         window.addEventListener('resize', this.resizeHandler)
 
@@ -100,11 +126,11 @@ export class XTermFrontend extends Frontend {
         host.addEventListener('mouseup', event => this.mouseEvent.next(event as MouseEvent))
         host.addEventListener('mousewheel', event => this.mouseEvent.next(event as MouseEvent))
 
-        let ro = new window['ResizeObserver'](() => this.resizeHandler())
+        const ro = new window['ResizeObserver'](() => this.resizeHandler())
         ro.observe(host)
     }
 
-    detach (host: HTMLElement): void {
+    detach (_host: HTMLElement): void {
         window.removeEventListener('resize', this.resizeHandler)
     }
 
@@ -113,7 +139,10 @@ export class XTermFrontend extends Frontend {
     }
 
     copySelection (): void {
-        (navigator as any).clipboard.writeText(this.getSelection())
+        require('electron').remote.clipboard.write({
+            text: this.getSelection(),
+            html: this.getSelectionAsHTML(),
+        })
     }
 
     clearSelection (): void {
@@ -141,7 +170,7 @@ export class XTermFrontend extends Frontend {
     }
 
     configure (): void {
-        let config = this.configService.store
+        const config = this.configService.store
 
         setImmediate(() => {
             if (this.xterm.cols && this.xterm.rows && this.xtermCore.charMeasure) {
@@ -155,10 +184,10 @@ export class XTermFrontend extends Frontend {
             }
         })
 
-        this.xterm.setOption('fontFamily', `"${config.terminal.font}", "monospace-fallback", monospace`)
+        this.xterm.setOption('fontFamily', getCSSFontFamily(config.terminal.font))
         this.xterm.setOption('bellStyle', config.terminal.bell)
         this.xterm.setOption('cursorStyle', {
-            beam: 'bar'
+            beam: 'bar',
         }[config.terminal.cursor] || config.terminal.cursor)
         this.xterm.setOption('cursorBlink', config.terminal.cursorBlink)
         this.xterm.setOption('macOptionIsMeta', config.terminal.altIsMeta)
@@ -168,19 +197,14 @@ export class XTermFrontend extends Frontend {
 
         this.copyOnSelect = config.terminal.copyOnSelect
 
-        let theme: ITheme = {
+        const theme: ITheme = {
             foreground: config.terminal.colorScheme.foreground,
-            background: (config.terminal.background === 'colorScheme') ? config.terminal.colorScheme.background : (config.appearance.vibrancy ? 'transparent' : this.themesService.findCurrentTheme().terminalBackground),
+            background: config.terminal.background === 'colorScheme' ? config.terminal.colorScheme.background : config.appearance.vibrancy ? 'transparent' : this.themesService.findCurrentTheme().terminalBackground,
             cursor: config.terminal.colorScheme.cursor,
         }
 
-        const colorNames = [
-            'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white',
-            'brightBlack', 'brightRed', 'brightGreen', 'brightYellow', 'brightBlue', 'brightMagenta', 'brightCyan', 'brightWhite'
-        ]
-
-        for (let i = 0; i < colorNames.length; i++) {
-            theme[colorNames[i]] = config.terminal.colorScheme.colors[i]
+        for (let i = 0; i < COLOR_NAMES.length; i++) {
+            theme[COLOR_NAMES[i]] = config.terminal.colorScheme.colors[i]
         }
 
         if (this.xtermCore._colorManager && !deepEqual(this.configuredTheme, theme)) {
@@ -188,7 +212,7 @@ export class XTermFrontend extends Frontend {
             this.configuredTheme = theme
         }
 
-        if (config.terminal.ligatures && this.xterm.element) {
+        if (this.opened && config.terminal.ligatures) {
             enableLigatures(this.xterm)
         }
     }
@@ -198,7 +222,74 @@ export class XTermFrontend extends Frontend {
         this.setFontSize()
     }
 
+    findNext (term: string, searchOptions?: SearchOptions): boolean {
+        return this.search.findNext(term, searchOptions)
+    }
+
+    findPrevious (term: string, searchOptions?: SearchOptions): boolean {
+        return this.search.findPrevious(term, searchOptions)
+    }
+
     private setFontSize () {
         this.xterm.setOption('fontSize', this.configuredFontSize * Math.pow(1.1, this.zoom))
+        this.resizeHandler()
     }
+
+    private getSelectionAsHTML (): string {
+        let html = `<div style="font-family: '${this.configService.store.terminal.font}', monospace; white-space: pre">`
+        const selection = this.xterm.getSelectionPosition()
+        if (!selection) {
+            return null
+        }
+        if (selection.startRow === selection.endRow) {
+            html += this.getLineAsHTML(selection.startRow, selection.startColumn, selection.endColumn)
+        } else {
+            html += this.getLineAsHTML(selection.startRow, selection.startColumn, this.xterm.cols)
+            for (let y = selection.startRow + 1; y < selection.endRow; y++) {
+                html += this.getLineAsHTML(y, 0, this.xterm.cols)
+            }
+            html += this.getLineAsHTML(selection.endRow, 0, selection.endColumn)
+        }
+        html += '</div>'
+        return html
+    }
+
+    private getHexColor (mode: number, color: number): string {
+        if (mode === Attributes.CM_RGB) {
+            const rgb = AttributeData.toColorRGB(color)
+            return rgb.map(x => x.toString(16).padStart(2, '0')).join('')
+        }
+        if (mode === Attributes.CM_P16 || mode === Attributes.CM_P256) {
+            return this.configService.store.terminal.colorScheme.colors[color]
+        }
+        return 'transparent'
+    }
+
+    private getLineAsHTML (y: number, start: number, end: number): string {
+        let html = '<div>'
+        let lastStyle = null
+        const line = (this.xterm.buffer.getLine(y) as any)._line
+        const cell = new CellData()
+        for (let i = start; i < end; i++) {
+            line.loadCell(i, cell)
+            const fg = this.getHexColor(cell.getFgColorMode(), cell.getFgColor())
+            const bg = this.getHexColor(cell.getBgColorMode(), cell.getBgColor())
+            const style = `color: ${fg}; background: ${bg}; font-weight: ${cell.isBold() ? 'bold' : 'normal'}; font-style: ${cell.isItalic() ? 'italic' : 'normal'}; text-decoration: ${cell.isUnderline() ? 'underline' : 'none'}`
+            if (style !== lastStyle) {
+                if (lastStyle !== null) {
+                    html += '</span>'
+                }
+                html += `<span style="${style}">`
+                lastStyle = style
+            }
+            html += line.getString(i) || ' '
+        }
+        html += '</span></div>'
+        return html
+    }
+}
+
+/** @hidden */
+export class XTermWebGLFrontend extends XTermFrontend {
+    protected enableWebGL = true
 }
