@@ -6,10 +6,6 @@ platform:
 environment:
   nodejs_version: "10"
 
-cache:
-  - "%USERPROFILE%\\.electron"
-  - "%LOCALAPPDATA%\\Yarn"
-
 version: "{build}"
 
 install:
@@ -24,3 +20,9 @@ build_script:
 
 artifacts:
   - path: 'dist\*.exe'
+
+cache:
+  - node_modules
+  - "*\\node_modules"
+  - "%USERPROFILE%\\.electron"
+  - "%LOCALAPPDATA%\\Yarn"
