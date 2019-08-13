@@ -1,12 +1,10 @@
 const path = require('path')
-const webpack = require('webpack')
 
 module.exports = {
     target: 'node',
     entry: 'src/index.ts',
-    devtool: 'source-map',
     context: __dirname,
-    mode: 'development',
+    devtool: 'cheap-module-eval-source-map',
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: 'index.js',
@@ -58,8 +56,5 @@ module.exports = {
         /^rxjs/,
         /^@angular/,
         /^@ng-bootstrap/,
-    ],
-    plugins: [
-        new webpack.optimize.ModuleConcatenationPlugin(),
     ],
 }

@@ -3,8 +3,8 @@ const path = require('path')
 module.exports = {
     target: 'node',
     entry: 'src/index.ts',
-    devtool: 'source-map',
     context: __dirname,
+    devtool: 'cheap-module-eval-source-map',
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: 'index.js',
@@ -49,10 +49,10 @@ module.exports = {
         'keytar',
         'path',
         'ngx-toastr',
-        '@terminus-term/windows-process-tree/build/Release/windows_process_tree.node',
+        'windows-process-tree/build/Release/windows_process_tree.node',
         /^rxjs/,
         /^@angular/,
         /^@ng-bootstrap/,
         /^terminus-/,
-    ]
+    ],
 }

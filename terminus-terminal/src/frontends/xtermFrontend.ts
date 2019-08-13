@@ -48,7 +48,7 @@ export class XTermFrontend extends Frontend {
             this.title.next(title)
         })
         this.xterm.onSelectionChange(() => {
-            if (this.copyOnSelect) {
+            if (this.copyOnSelect && this.getSelection()) {
                 this.copySelection()
             }
         })
@@ -85,7 +85,20 @@ export class XTermFrontend extends Frontend {
 
         this.resizeHandler = () => {
             try {
-                this.fitAddon.fit()
+                if (this.xtermCore.element && getComputedStyle(this.xtermCore.element).getPropertyValue('height') !== 'auto') {
+                    let t = window.getComputedStyle(this.xtermCore.element.parentElement)
+                    let r = parseInt(t.getPropertyValue("height"))
+                    let n = Math.max(0, parseInt(t.getPropertyValue("width")))
+                    let o = window.getComputedStyle(this.xtermCore.element)
+                    let i = r - (parseInt(o.getPropertyValue("padding-top")) + parseInt(o.getPropertyValue("padding-bottom")))
+                    let l = n - (parseInt(o.getPropertyValue("padding-right")) + parseInt(o.getPropertyValue("padding-left"))) - this.xtermCore.viewport.scrollBarWidth
+                    let actualCellWidth = this.xtermCore._renderService.dimensions.actualCellWidth || 9
+                    let actualCellHeight = this.xtermCore._renderService.dimensions.actualCellHeight || 17
+                    let cols = Math.floor(l / actualCellWidth)
+                    let rows = Math.floor(i / actualCellHeight)
+
+                    this.xterm.resize(cols, rows)
+                }
             } catch (e) {
                 // tends to throw when element wasn't shown yet
                 console.warn('Could not resize xterm', e)

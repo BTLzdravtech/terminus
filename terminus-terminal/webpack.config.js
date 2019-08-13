@@ -1,11 +1,10 @@
 const path = require('path')
-const webpack = require('webpack')
 
 module.exports = {
     target: 'node',
     entry: 'src/index.ts',
-    devtool: 'source-map',
     context: __dirname,
+    devtool: 'cheap-module-eval-source-map',
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: 'index.js',
@@ -67,15 +66,12 @@ module.exports = {
         'macos-native-processlist',
         'windows-native-registry',
         'node-pty',
-        '@terminus-term/windows-process-tree',
+        'windows-process-tree',
         'os',
         /^rxjs/,
         /^@angular/,
         /^@ng-bootstrap/,
         'ngx-toastr',
         /^terminus-/,
-    ],
-    plugins: [
-        new webpack.optimize.ModuleConcatenationPlugin(),
     ],
 }

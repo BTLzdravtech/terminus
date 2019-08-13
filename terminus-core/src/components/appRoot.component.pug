@@ -6,9 +6,7 @@ title-bar(
 .content(
     [class.tabs-on-top]='config.store.appearance.tabsLocation == "top"'
 )
-    .tab-bar(
-        *ngIf='!hostApp.isFullScreen',
-    )
+    .tab-bar
         .inset.background(*ngIf='hostApp.platform == Platform.macOS && config.store.appearance.frame == "thin" && config.store.appearance.tabsLocation == "top"')
         .tabs(
             dnd-sortable-container,
@@ -77,7 +75,7 @@ title-bar(
 
             button.btn.btn-secondary.btn-tab-bar.btn-update(
                 *ngIf='updatesAvailable',
-                title='Update available',
+                title='Update available - Click to install',
                 (click)='updateApp()',
                 [innerHTML]='sanitizeIcon(updateIcon)'
             )
