@@ -2,7 +2,7 @@ import { Frontend, SearchOptions } from './frontend'
 import { Terminal, ITheme } from 'xterm'
 import { getCSSFontFamily } from '../utils'
 import { FitAddon } from 'xterm-addon-fit'
-import { enableLigatures } from 'xterm-addon-ligatures'
+import { LigaturesAddon } from 'xterm-addon-ligatures'
 import { SearchAddon } from 'xterm-addon-search'
 import { WebglAddon } from 'xterm-addon-webgl'
 import './xterm.css'
@@ -29,6 +29,7 @@ export class XTermFrontend extends Frontend {
     private copyOnSelect = false
     private search = new SearchAddon()
     private fitAddon = new FitAddon()
+    private ligaturesAddon: LigaturesAddon
     private opened = false
 
     constructor () {
@@ -38,8 +39,11 @@ export class XTermFrontend extends Frontend {
         })
         this.xtermCore = (this.xterm as any)._core
 
+        this.xterm.onBinary(data => {
+            this.input.next(Buffer.from(data, 'binary'))
+        })
         this.xterm.onData(data => {
-            this.input.next(data)
+            this.input.next(Buffer.from(data, 'utf-8'))
         })
         this.xterm.onResize(({ cols, rows }) => {
             this.resize.next({ rows, columns: cols })
@@ -85,13 +89,13 @@ export class XTermFrontend extends Frontend {
 
         this.resizeHandler = () => {
             try {
-                if (this.xtermCore.element && getComputedStyle(this.xtermCore.element).getPropertyValue('height') !== 'auto') {
-                    let t = window.getComputedStyle(this.xtermCore.element.parentElement)
-                    let r = parseInt(t.getPropertyValue("height"))
-                    let n = Math.max(0, parseInt(t.getPropertyValue("width")))
-                    let o = window.getComputedStyle(this.xtermCore.element)
-                    let i = r - (parseInt(o.getPropertyValue("padding-top")) + parseInt(o.getPropertyValue("padding-bottom")))
-                    let l = n - (parseInt(o.getPropertyValue("padding-right")) + parseInt(o.getPropertyValue("padding-left"))) - this.xtermCore.viewport.scrollBarWidth
+                if (this.xterm.element && getComputedStyle(this.xterm.element).getPropertyValue('height') !== 'auto') {
+                    let t = window.getComputedStyle(this.xterm.element.parentElement!)
+                    let r = parseInt(t.getPropertyValue('height'))
+                    let n = Math.max(0, parseInt(t.getPropertyValue('width')))
+                    let o = window.getComputedStyle(this.xterm.element)
+                    let i = r - (parseInt(o.getPropertyValue('padding-top')) + parseInt(o.getPropertyValue('padding-bottom')))
+                    let l = n - (parseInt(o.getPropertyValue('padding-right')) + parseInt(o.getPropertyValue('padding-left'))) - this.xtermCore.viewport.scrollBarWidth
                     let actualCellWidth = this.xtermCore._renderService.dimensions.actualCellWidth || 9
                     let actualCellHeight = this.xtermCore._renderService.dimensions.actualCellHeight || 17
                     let cols = Math.floor(l / actualCellWidth)
@@ -112,6 +116,8 @@ export class XTermFrontend extends Frontend {
     }
 
     attach (host: HTMLElement): void {
+        this.configure()
+
         this.xterm.open(host)
         this.opened = true
 
@@ -119,11 +125,7 @@ export class XTermFrontend extends Frontend {
             this.xterm.loadAddon(new WebglAddon())
         }
 
-        if (this.configService.store.terminal.ligatures) {
-            enableLigatures(this.xterm)
-        }
-
-        this.ready.next(null)
+        this.ready.next()
         this.ready.complete()
 
         this.xterm.loadAddon(this.search)
@@ -197,7 +199,7 @@ export class XTermFrontend extends Frontend {
             }
         })
 
-        this.xterm.setOption('fontFamily', getCSSFontFamily(config.terminal.font))
+        this.xterm.setOption('fontFamily', getCSSFontFamily(config))
         this.xterm.setOption('bellStyle', config.terminal.bell)
         this.xterm.setOption('cursorStyle', {
             beam: 'bar',
@@ -212,7 +214,7 @@ export class XTermFrontend extends Frontend {
 
         const theme: ITheme = {
             foreground: config.terminal.colorScheme.foreground,
-            background: config.terminal.background === 'colorScheme' ? config.terminal.colorScheme.background : config.appearance.vibrancy ? 'transparent' : this.themesService.findCurrentTheme().terminalBackground,
+            background: config.terminal.background === 'colorScheme' ? config.terminal.colorScheme.background : '#00000000',
             cursor: config.terminal.colorScheme.cursor,
         }
 
@@ -225,8 +227,9 @@ export class XTermFrontend extends Frontend {
             this.configuredTheme = theme
         }
 
-        if (this.opened && config.terminal.ligatures) {
-            enableLigatures(this.xterm)
+        if (this.opened && config.terminal.ligatures && !this.ligaturesAddon) {
+            this.ligaturesAddon = new LigaturesAddon()
+            this.xterm.loadAddon(this.ligaturesAddon)
         }
     }
 
@@ -252,13 +255,13 @@ export class XTermFrontend extends Frontend {
         let html = `<div style="font-family: '${this.configService.store.terminal.font}', monospace; white-space: pre">`
         const selection = this.xterm.getSelectionPosition()
         if (!selection) {
-            return null
+            return ''
         }
         if (selection.startRow === selection.endRow) {
             html += this.getLineAsHTML(selection.startRow, selection.startColumn, selection.endColumn)
         } else {
             html += this.getLineAsHTML(selection.startRow, selection.startColumn, this.xterm.cols)
-            for (let y = selection.startRow + 1; y < selection.endRow; y++) {
+            for (let y = selection.startRow! + 1; y < selection.endRow; y++) {
                 html += this.getLineAsHTML(y, 0, this.xterm.cols)
             }
             html += this.getLineAsHTML(selection.endRow, 0, selection.endColumn)
@@ -267,7 +270,7 @@ export class XTermFrontend extends Frontend {
         return html
     }
 
-    private getHexColor (mode: number, color: number): string {
+    private getHexColor (mode: number, color: number, def: string): string {
         if (mode === Attributes.CM_RGB) {
             const rgb = AttributeData.toColorRGB(color)
             return rgb.map(x => x.toString(16).padStart(2, '0')).join('')
@@ -275,18 +278,18 @@ export class XTermFrontend extends Frontend {
         if (mode === Attributes.CM_P16 || mode === Attributes.CM_P256) {
             return this.configService.store.terminal.colorScheme.colors[color]
         }
-        return 'transparent'
+        return def
     }
 
     private getLineAsHTML (y: number, start: number, end: number): string {
         let html = '<div>'
-        let lastStyle = null
+        let lastStyle: string|null = null
         const line = (this.xterm.buffer.getLine(y) as any)._line
         const cell = new CellData()
         for (let i = start; i < end; i++) {
             line.loadCell(i, cell)
-            const fg = this.getHexColor(cell.getFgColorMode(), cell.getFgColor())
-            const bg = this.getHexColor(cell.getBgColorMode(), cell.getBgColor())
+            const fg = this.getHexColor(cell.getFgColorMode(), cell.getFgColor(), this.configService.store.terminal.colorScheme.foreground)
+            const bg = this.getHexColor(cell.getBgColorMode(), cell.getBgColor(), this.configService.store.terminal.colorScheme.background)
             const style = `color: ${fg}; background: ${bg}; font-weight: ${cell.isBold() ? 'bold' : 'normal'}; font-style: ${cell.isItalic() ? 'italic' : 'normal'}; text-decoration: ${cell.isUnderline() ? 'underline' : 'none'}`
             if (style !== lastStyle) {
                 if (lastStyle !== null) {

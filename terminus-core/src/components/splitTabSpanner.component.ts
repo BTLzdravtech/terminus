@@ -16,13 +16,17 @@ export class SplitTabSpannerComponent {
     @HostBinding('class.v') isVertical = true
     @HostBinding('style.left') cssLeft: string
     @HostBinding('style.top') cssTop: string
-    @HostBinding('style.width') cssWidth: string
-    @HostBinding('style.height') cssHeight: string
+    @HostBinding('style.width') cssWidth: string | null
+    @HostBinding('style.height') cssHeight: string | null
     private marginOffset = -5
 
     constructor (private element: ElementRef) { }
 
     ngAfterViewInit () {
+        this.element.nativeElement.addEventListener('dblclick', () => {
+            this.reset()
+        })
+
         this.element.nativeElement.addEventListener('mousedown', (e: MouseEvent) => {
             this.isActive = true
             const start = this.isVertical ? e.pageY : e.pageX
@@ -49,14 +53,16 @@ export class SplitTabSpannerComponent {
                 diff = Math.max(diff, -this.container.ratios[this.index - 1] + 0.1)
                 diff = Math.min(diff, this.container.ratios[this.index] - 0.1)
 
-                this.container.ratios[this.index - 1] += diff
-                this.container.ratios[this.index] -= diff
-                this.change.emit()
+                if (diff) {
+                    this.container.ratios[this.index - 1] += diff
+                    this.container.ratios[this.index] -= diff
+                    this.change.emit()
+                }
             }
 
-            document.addEventListener('mouseup', offHandler)
+            document.addEventListener('mouseup', offHandler, { passive: true })
             this.element.nativeElement.parentElement.addEventListener('mousemove', dragHandler)
-        })
+        }, { passive: true })
     }
 
     ngOnChanges () {
@@ -67,16 +73,23 @@ export class SplitTabSpannerComponent {
                 this.container.x,
                 this.container.y + this.container.h * this.container.getOffsetRatio(this.index),
                 this.container.w,
-                null
+                0
             )
         } else {
             this.setDimensions(
                 this.container.x + this.container.w * this.container.getOffsetRatio(this.index),
                 this.container.y,
-                null,
+                0,
                 this.container.h
             )
         }
+    }
+
+    reset () {
+        const ratio = (this.container.ratios[this.index - 1] + this.container.ratios[this.index]) / 2
+        this.container.ratios[this.index - 1] = ratio
+        this.container.ratios[this.index] = ratio
+        this.change.emit()
     }
 
     private setDimensions (x: number, y: number, w: number, h: number) {

@@ -15,7 +15,7 @@ export class SSHModalComponent {
     connections: SSHConnection[]
     childFolders: SSHConnectionGroup[]
     quickTarget: string
-    lastConnection: SSHConnection
+    lastConnection: SSHConnection|null = null
     childGroups: SSHConnectionGroup[]
     groupCollapsed: {[id: string]: boolean} = {}
 
@@ -49,6 +49,7 @@ export class SSHModalComponent {
 
         const connection: SSHConnection = {
             name: this.quickTarget,
+            group: null,
             host,
             user,
             port,
@@ -87,7 +88,7 @@ export class SSHModalComponent {
 
         let connections = this.connections
         if (this.quickTarget) {
-            connections = connections.filter(connection => (connection.name + connection.group).toLowerCase().includes(this.quickTarget))
+            connections = connections.filter((connection: SSHConnection) => (connection.name + connection.group!).toLowerCase().includes(this.quickTarget))
         }
 
         for (const connection of connections) {
@@ -95,10 +96,10 @@ export class SSHModalComponent {
             let group = this.childGroups.find(x => x.name === connection.group)
             if (!group) {
                 group = {
-                    name: connection.group,
+                    name: connection.group!,
                     connections: [],
                 }
-                this.childGroups.push(group)
+                this.childGroups.push(group!)
             }
             group.connections.push(connection)
         }

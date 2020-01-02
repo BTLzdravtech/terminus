@@ -15,6 +15,7 @@ export class TerminalConfigProvider extends ConfigProvider {
             frontend: 'xterm',
             autoOpen: false,
             fontSize: 14,
+            fallbackFont: null,
             linePadding: 0,
             bell: 'off',
             bracketedPaste: false,
@@ -24,6 +25,7 @@ export class TerminalConfigProvider extends ConfigProvider {
             cursorBlink: true,
             customShell: '',
             rightClick: 'menu',
+            pasteOnMiddleClick: true,
             copyOnSelect: false,
             scrollOnInput: true,
             workingDirectory: '',
@@ -58,6 +60,7 @@ export class TerminalConfigProvider extends ConfigProvider {
             environment: {},
             profiles: [],
             useConPTY: true,
+            recoverTabs: true,
         },
     }
 
@@ -111,6 +114,7 @@ export class TerminalConfigProvider extends ConfigProvider {
                 shell: 'clink',
                 profile: 'cmd-clink',
                 rightClick: 'paste',
+                pasteOnMiddleClick: false,
                 copyOnSelect: true,
             },
             hotkeys: {
@@ -121,9 +125,7 @@ export class TerminalConfigProvider extends ConfigProvider {
                 paste: [
                     'Ctrl-Shift-V',
                 ],
-                clear: [
-                    'Ctrl-L',
-                ],
+                clear: [],
                 'zoom-in': [
                     'Ctrl-=',
                     'Ctrl-Shift-=',
@@ -163,9 +165,7 @@ export class TerminalConfigProvider extends ConfigProvider {
                 paste: [
                     'Ctrl-Shift-V',
                 ],
-                clear: [
-                    'Ctrl-L',
-                ],
+                clear: [],
                 'zoom-in': [
                     'Ctrl-=',
                     'Ctrl-Shift-=',

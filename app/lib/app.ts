@@ -13,16 +13,18 @@ export class Application {
         })
 
         const configData = loadConfig()
-        if (process.platform === 'linux' && ((configData.appearance || {}).opacity || 1) !== 1) {
-            app.commandLine.appendSwitch('enable-transparent-visuals')
-            app.disableHardwareAcceleration()
+        if (process.platform === 'linux') {
+            app.commandLine.appendSwitch('no-sandbox')
+            if (((configData.appearance || {}).opacity || 1) !== 1) {
+                app.commandLine.appendSwitch('enable-transparent-visuals')
+                app.disableHardwareAcceleration()
+            }
         }
 
         app.commandLine.appendSwitch('disable-http-cache')
         app.commandLine.appendSwitch('lang', 'EN')
 
         for (const flag of configData.flags || [['force_discrete_gpu', '0']]) {
-            console.log('Setting Electron flag:', flag.join('='))
             app.commandLine.appendSwitch(flag[0], flag[1])
         }
     }
@@ -124,7 +126,7 @@ export class Application {
                     { role: 'services', submenu: [] },
                     { type: 'separator' },
                     { role: 'hide' },
-                    { role: 'hideothers' },
+                    { role: 'hideOthers' },
                     { role: 'unhide' },
                     { type: 'separator' },
                     {
@@ -145,21 +147,21 @@ export class Application {
                     { role: 'cut' },
                     { role: 'copy' },
                     { role: 'paste' },
-                    { role: 'pasteandmatchstyle' },
+                    { role: 'pasteAndMatchStyle' },
                     { role: 'delete' },
-                    { role: 'selectall' },
+                    { role: 'selectAll' },
                 ],
             },
             {
                 label: 'View',
                 submenu: [
                     { role: 'reload' },
-                    { role: 'forcereload' },
-                    { role: 'toggledevtools' },
+                    { role: 'forceReload' },
+                    { role: 'toggleDevTools' },
                     { type: 'separator' },
-                    { role: 'resetzoom' },
-                    { role: 'zoomin' },
-                    { role: 'zoomout' },
+                    { role: 'resetZoom' },
+                    { role: 'zoomIn' },
+                    { role: 'zoomOut' },
                     { type: 'separator' },
                     { role: 'togglefullscreen' },
                 ],

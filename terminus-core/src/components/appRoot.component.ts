@@ -1,6 +1,5 @@
 import { Component, Inject, Input, HostListener, HostBinding } from '@angular/core'
 import { trigger, style, animate, transition, state } from '@angular/animations'
-import { DomSanitizer } from '@angular/platform-browser'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 
 import { ElectronService } from '../services/electron.service'
@@ -75,7 +74,6 @@ export class AppRootComponent {
         public hostApp: HostAppService,
         public config: ConfigService,
         public app: AppService,
-        private domSanitizer: DomSanitizer,
         @Inject(ToolbarButtonProvider) private toolbarButtonProviders: ToolbarButtonProvider[],
         log: LogService,
         ngbModal: NgbModal,
@@ -128,7 +126,9 @@ export class AppRootComponent {
         })
 
         this.hostApp.windowCloseRequest$.subscribe(async () => {
-            await this.app.closeAllTabs() && this.hostApp.closeWindow()
+            if (await this.app.closeAllTabs()) {
+                this.hostApp.closeWindow()
+            }
         })
 
         if (window['safeModeReason']) {
@@ -144,7 +144,7 @@ export class AppRootComponent {
         config.changed$.subscribe(() => this.updateVibrancy())
         this.updateVibrancy()
 
-        let lastProgress = null
+        let lastProgress: number|null = null
         this.app.tabOpened$.subscribe(tab => {
             this.unsortedTabs.push(tab)
             tab.progress$.subscribe(progress => {
@@ -217,8 +217,18 @@ export class AppRootComponent {
         return false
     }
 
-    updateApp () {
-        this.updater.update()
+    async updateApp () {
+        if ((await this.electron.showMessageBox(
+            this.hostApp.getWindow(),
+            {
+                type: 'warning',
+                message: 'Installing the update will close all tabs and restart Terminus.',
+                buttons: ['Cancel', 'Update'],
+                defaultId: 1,
+            }
+        )).response === 1) {
+            this.updater.update()
+        }
     }
 
     onTabDragStart () {
@@ -238,8 +248,8 @@ export class AppRootComponent {
         }
     }
 
-    sanitizeIcon (icon: string): any {
-        return this.domSanitizer.bypassSecurityTrustHtml(icon || '')
+    hasIcons (submenuItems: ToolbarButton[]): boolean {
+        return submenuItems.some(x => !!x.icon)
     }
 
     private getToolbarButtons (aboveZero: boolean): ToolbarButton[] {
@@ -248,7 +258,7 @@ export class AppRootComponent {
             buttons = buttons.concat(provider.provide())
         })
         return buttons
-            .filter(button => button.weight > 0 === aboveZero)
+            .filter(button => (button.weight || 0) > 0 === aboveZero)
             .sort((a: ToolbarButton, b: ToolbarButton) => (a.weight || 0) - (b.weight || 0))
     }
 

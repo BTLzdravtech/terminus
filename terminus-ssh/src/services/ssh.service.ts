@@ -20,7 +20,7 @@ export class SSHService {
     private logger: Logger
 
     private constructor (
-        log: LogService,
+        private log: LogService,
         private app: AppService,
         private zone: NgZone,
         private ngbModal: NgbModal,
@@ -32,15 +32,25 @@ export class SSHService {
     }
 
     async openTab (connection: SSHConnection): Promise<SSHTabComponent> {
-        return this.zone.run(() => this.app.openNewTab(
+        const tab = this.zone.run(() => this.app.openNewTab(
             SSHTabComponent,
             { connection }
         ) as SSHTabComponent)
+        if (connection.color) {
+            (this.app.getParentTab(tab) || tab).color = connection.color
+        }
+        return tab
     }
 
-    async connectSession (session: SSHSession, logCallback?: (s: string) => void): Promise<void> {
-        let privateKey: string = null
-        let privateKeyPassphrase: string = null
+    createSession (connection: SSHConnection): SSHSession {
+        const session = new SSHSession(connection)
+        session.logger = this.log.create(`ssh-${connection.host}-${connection.port}`)
+        return session
+    }
+
+    async connectSession (session: SSHSession, logCallback?: (s: any) => void): Promise<void> {
+        let privateKey: string|null = null
+        let privateKeyPassphrase: string|null = null
         let privateKeyPath = session.connection.privateKey
 
         if (!logCallback) {
@@ -48,12 +58,12 @@ export class SSHService {
         }
 
         const log = (s: any) => {
-            logCallback(s)
+            logCallback!(s)
             this.logger.info(s)
         }
 
         if (!privateKeyPath) {
-            const userKeyPath = path.join(process.env.HOME, '.ssh', 'id_rsa')
+            const userKeyPath = path.join(process.env.HOME as string, '.ssh', 'id_rsa')
             if (await fs.exists(userKeyPath)) {
                 log(`Using user's default private key: ${userKeyPath}`)
                 privateKeyPath = userKeyPath
@@ -91,8 +101,9 @@ export class SSHService {
         }
 
         const ssh = new Client()
+        session.ssh = ssh
         let connected = false
-        let savedPassword: string = null
+        let savedPassword: string|null = null
         await new Promise(async (resolve, reject) => {
             ssh.on('ready', () => {
                 connected = true
@@ -116,7 +127,7 @@ export class SSHService {
             ssh.on('keyboard-interactive', (name, instructions, instructionsLang, prompts, finish) => this.zone.run(async () => {
                 log(`Keyboard-interactive auth requested: ${name}`)
                 this.logger.info('Keyboard-interactive auth:', name, instructions, instructionsLang)
-                const results = []
+                const results: string[] = []
                 for (const prompt of prompts) {
                     const modal = this.ngbModal.open(PromptModalComponent)
                     modal.componentInstance.prompt = prompt.prompt
@@ -135,7 +146,7 @@ export class SSHService {
                 log('Banner: \n' + banner)
             })
 
-            let agent: string = null
+            let agent: string|null = null
             if (this.hostApp.platform === Platform.Windows) {
                 const pageantRunning = new Promise<boolean>(resolve => {
                     windowsProcessTreeNative.getProcessList(list => { // eslint-disable-line block-scoped-var
@@ -146,7 +157,7 @@ export class SSHService {
                     agent = 'pageant'
                 }
             } else {
-                agent = process.env.SSH_AUTH_SOCK
+                agent = process.env.SSH_AUTH_SOCK as string
             }
 
             try {
@@ -155,10 +166,10 @@ export class SSHService {
                     port: session.connection.port || 22,
                     username: session.connection.user,
                     password: session.connection.privateKey ? undefined : '',
-                    privateKey,
-                    passphrase: privateKeyPassphrase,
+                    privateKey: privateKey || undefined,
+                    passphrase: privateKeyPassphrase || undefined,
                     tryKeyboard: true,
-                    agent,
+                    agent: agent || undefined,
                     agentForward: !!agent,
                     keepaliveInterval: session.connection.keepaliveInterval,
                     keepaliveCountMax: session.connection.keepaliveCountMax,
@@ -210,31 +221,6 @@ export class SSHService {
                 }
             })
         })
-
-        try {
-            const shell: any = await new Promise<any>((resolve, reject) => {
-                ssh.shell({ term: 'xterm-256color' }, (err, shell) => {
-                    if (err) {
-                        reject(err)
-                    } else {
-                        resolve(shell)
-                    }
-                })
-            })
-
-            session.shell = shell
-
-            shell.on('greeting', greeting => {
-                log(`Shell Greeting: ${greeting}`)
-            })
-
-            shell.on('banner', banner => {
-                log(`Shell Banner: ${banner}`)
-            })
-        } catch (error) {
-            this.toastr.error(error.message)
-            throw error
-        }
     }
 }
 

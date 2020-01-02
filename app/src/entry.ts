@@ -7,7 +7,8 @@ import * as isDev from 'electron-is-dev'
 import './global.scss'
 import './toastr.scss'
 
-import { enableProdMode, NgModuleRef } from '@angular/core'
+import { enableProdMode, NgModuleRef, ApplicationRef } from '@angular/core'
+import { enableDebugTools } from '@angular/platform-browser'
 import { platformBrowserDynamic } from '@angular/platform-browser-dynamic'
 
 import { getRootModule } from './app.module'
@@ -18,8 +19,8 @@ location.hash = ''
 
 ;(process as any).enablePromiseAPI = true
 
-if (process.platform === 'win32') {
-    process.env.HOME = process.env.HOMEDRIVE + process.env.HOMEPATH
+if (process.platform === 'win32' && !('HOME' in process.env)) {
+    process.env.HOME = `${process.env.HOMEDRIVE}${process.env.HOMEPATH}`
 }
 
 if (isDev) {
@@ -37,7 +38,14 @@ async function bootstrap (plugins: PluginInfo[], safeMode = false): Promise<NgMo
     })
     const module = getRootModule(pluginsModules)
     window['rootModule'] = module
-    return platformBrowserDynamic().bootstrapModule(module)
+    return platformBrowserDynamic().bootstrapModule(module).then(moduleRef => {
+        if (isDev) {
+            const applicationRef = moduleRef.injector.get(ApplicationRef)
+            const componentRef = applicationRef.components[0]
+            enableDebugTools(componentRef)
+        }
+        return moduleRef
+    })
 }
 
 findPlugins().then(async plugins => {

@@ -30,8 +30,8 @@ export interface ChildProcess {
 
 const windowsDirectoryRegex = /([a-zA-Z]:[^\:\[\]\?\"\<\>\|]+)/mi
 const catalinaDataVolumePrefix = '/System/Volumes/Data'
-const OSC1337Prefix = '\x1b]1337;'
-const OSC1337Suffix = '\x07'
+const OSC1337Prefix = Buffer.from('\x1b]1337;')
+const OSC1337Suffix = Buffer.from('\x07')
 
 /**
  * A session object for a [[BaseTerminalTabComponent]]
@@ -42,27 +42,31 @@ export abstract class BaseSession {
     name: string
     truePID: number
     protected output = new Subject<string>()
+    protected binaryOutput = new Subject<Buffer>()
     protected closed = new Subject<void>()
     protected destroyed = new Subject<void>()
-    private initialDataBuffer = ''
+    private initialDataBuffer = Buffer.from('')
     private initialDataBufferReleased = false
 
     get output$ (): Observable<string> { return this.output }
+    get binaryOutput$ (): Observable<Buffer> { return this.binaryOutput }
     get closed$ (): Observable<void> { return this.closed }
     get destroyed$ (): Observable<void> { return this.destroyed }
 
-    emitOutput (data: string) {
+    emitOutput (data: Buffer) {
         if (!this.initialDataBufferReleased) {
-            this.initialDataBuffer += data
+            this.initialDataBuffer = Buffer.concat([this.initialDataBuffer, data])
         } else {
-            this.output.next(data)
+            this.output.next(data.toString())
+            this.binaryOutput.next(data)
         }
     }
 
     releaseInitialDataBuffer () {
         this.initialDataBufferReleased = true
-        this.output.next(this.initialDataBuffer)
-        this.initialDataBuffer = null
+        this.output.next(this.initialDataBuffer.toString())
+        this.binaryOutput.next(this.initialDataBuffer)
+        this.initialDataBuffer = Buffer.from('')
     }
 
     async destroy (): Promise<void> {
@@ -71,24 +75,25 @@ export abstract class BaseSession {
             this.closed.next()
             this.destroyed.next()
             this.output.complete()
+            this.binaryOutput.complete()
             await this.gracefullyKillProcess()
         }
     }
 
     abstract start (options: SessionOptions): void
     abstract resize (columns: number, rows: number): void
-    abstract write (data: string): void
+    abstract write (data: Buffer): void
     abstract kill (signal?: string): void
     abstract async getChildProcesses (): Promise<ChildProcess[]>
     abstract async gracefullyKillProcess (): Promise<void>
-    abstract async getWorkingDirectory (): Promise<string>
+    abstract async getWorkingDirectory (): Promise<string|null>
 }
 
 /** @hidden */
 export class Session extends BaseSession {
     private pty: any
     private pauseAfterExit = false
-    private guessedCWD: string
+    private guessedCWD: string|null = null
     private reportedCWD: string
 
     constructor (private config: ConfigService) {
@@ -96,7 +101,7 @@ export class Session extends BaseSession {
     }
 
     start (options: SessionOptions) {
-        this.name = options.name
+        this.name = options.name || ''
 
         const env = {
             ...process.env,
@@ -122,20 +127,21 @@ export class Session extends BaseSession {
 
         if (!fs.existsSync(cwd)) {
             console.warn('Ignoring non-existent CWD:', cwd)
-            cwd = null
+            cwd = undefined
         }
 
         this.pty = nodePTY.spawn(options.command, options.args || [], {
             name: 'xterm-256color',
             cols: options.width || 80,
             rows: options.height || 30,
+            encoding: null,
             cwd,
             env: env,
             // `1` instead of `true` forces ConPTY even if unstable
-            experimentalUseConpty: (isWindowsBuild(WIN_BUILD_CONPTY_SUPPORTED) && this.config.store.terminal.useConPTY ? 1 : false) as any,
+            useConpty: (isWindowsBuild(WIN_BUILD_CONPTY_SUPPORTED) && this.config.store.terminal.useConPTY ? 1 : false) as any,
         })
 
-        this.guessedCWD = cwd
+        this.guessedCWD = cwd || null
 
         this.truePID = this.pty['pid']
 
@@ -150,11 +156,11 @@ export class Session extends BaseSession {
 
         this.open = true
 
-        this.pty.on('data-buffered', data => {
+        this.pty.on('data-buffered', (data: Buffer) => {
             data = this.processOSC1337(data)
             this.emitOutput(data)
             if (process.platform === 'win32') {
-                this.guessWindowsCWD(data)
+                this.guessWindowsCWD(data.toString())
             }
         })
 
@@ -168,28 +174,28 @@ export class Session extends BaseSession {
 
         this.pty.on('close', () => {
             if (this.pauseAfterExit) {
-                this.emitOutput('\r\nPress any key to close\r\n')
+                this.emitOutput(Buffer.from('\r\nPress any key to close\r\n'))
             } else if (this.open) {
                 this.destroy()
             }
         })
 
-        this.pauseAfterExit = options.pauseAfterExit
+        this.pauseAfterExit = options.pauseAfterExit || false
     }
 
-    processOSC1337 (data: string) {
+    processOSC1337 (data: Buffer) {
         if (data.includes(OSC1337Prefix)) {
-            const preData = data.substring(0, data.indexOf(OSC1337Prefix))
-            let params = data.substring(data.indexOf(OSC1337Prefix) + OSC1337Prefix.length)
-            const postData = params.substring(params.indexOf(OSC1337Suffix) + OSC1337Suffix.length)
-            params = params.substring(0, params.indexOf(OSC1337Suffix))
+            const preData = data.subarray(0, data.indexOf(OSC1337Prefix))
+            let params = data.subarray(data.indexOf(OSC1337Prefix) + OSC1337Prefix.length)
+            const postData = params.subarray(params.indexOf(OSC1337Suffix) + OSC1337Suffix.length)
+            const paramString = params.subarray(0, params.indexOf(OSC1337Suffix)).toString()
 
-            if (params.startsWith('CurrentDir=')) {
-                this.reportedCWD = params.split('=')[1]
+            if (paramString.startsWith('CurrentDir=')) {
+                this.reportedCWD = paramString.split('=')[1]
                 if (this.reportedCWD.startsWith('~')) {
                     this.reportedCWD = os.homedir() + this.reportedCWD.substring(1)
                 }
-                data = preData + postData
+                data = Buffer.concat([preData, postData])
             }
         }
         return data
@@ -201,10 +207,10 @@ export class Session extends BaseSession {
         }
     }
 
-    write (data) {
+    write (data: Buffer) {
         if (this.open) {
             if (this.pty._writable) {
-                this.pty.write(Buffer.from(data, 'utf-8'))
+                this.pty.write(data)
             } else {
                 this.destroy()
             }
@@ -255,22 +261,22 @@ export class Session extends BaseSession {
             await new Promise((resolve) => {
                 this.kill('SIGTERM')
                 setImmediate(() => {
-                    if (!this.open) {
-                        resolve()
-                    } else {
+                    try {
+                        process.kill(this.pty.pid, 0)
+                        // still alive
                         setTimeout(() => {
-                            if (this.open) {
-                                this.kill('SIGKILL')
-                            }
+                            this.kill('SIGKILL')
                             resolve()
                         }, 1000)
+                    } catch {
+                        resolve()
                     }
                 })
             })
         }
     }
 
-    async getWorkingDirectory (): Promise<string> {
+    async getWorkingDirectory (): Promise<string|null> {
         if (this.reportedCWD) {
             return this.reportedCWD
         }
@@ -291,7 +297,12 @@ export class Session extends BaseSession {
             return cwd
         }
         if (process.platform === 'linux') {
-            return fs.readlink(`/proc/${this.truePID}/cwd`)
+            try {
+                return fs.readlink(`/proc/${this.truePID}/cwd`)
+            } catch (exc) {
+                console.error(exc)
+                return null
+            }
         }
         if (process.platform === 'win32') {
             if (!this.guessedCWD) {
@@ -325,7 +336,7 @@ export class SessionsService {
     constructor (
         log: LogService,
     ) {
-        require('../bufferizedPTY')(nodePTY)
+        require('../bufferizedPTY')(nodePTY) // eslint-disable-line @typescript-eslint/no-var-requires
         this.logger = log.create('sessions')
     }
 

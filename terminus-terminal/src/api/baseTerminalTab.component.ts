@@ -22,8 +22,8 @@ export interface ToastrServiceProxy {
  * A class to base your custom terminal tabs on
  */
 export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit, OnDestroy {
-    static template = require('../components/baseTerminalTab.component.pug')
-    static styles = [require('../components/terminalTab.component.scss')]
+    static template = require<string>('../components/baseTerminalTab.component.pug')
+    static styles = [require<string>('../components/terminalTab.component.scss')]
     static animations: AnimationTriggerMetadata[] = [trigger('slideInOut', [
         transition(':enter', [
             style({ transform: 'translateY(-25%)' }),
@@ -43,7 +43,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     @ViewChild('content') content
 
     /** @hidden */
-    @HostBinding('style.background-color') backgroundColor: string
+    @HostBinding('style.background-color') backgroundColor: string|null = null
 
     /** @hidden */
     @HostBinding('class.top-padded') topPadded: boolean
@@ -56,6 +56,11 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     frontendReady = new Subject<void>()
     size: ResizeEvent
 
+    /**
+     * Enables normall passthrough from session output to terminal input
+     */
+    enablePassthrough = true
+
     protected logger: Logger
     protected output = new Subject<string>()
     private sessionCloseSubscription: Subscription
@@ -63,7 +68,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     private bellPlayer: HTMLAudioElement
     private termContainerSubscriptions: Subscription[] = []
 
-    get input$ (): Observable<string> { return this.frontend.input$ }
+    get input$ (): Observable<Buffer> { return this.frontend.input$ }
     get output$ (): Observable<string> { return this.output }
     get resize$ (): Observable<ResizeEvent> { return this.frontend.resize$ }
     get alternateScreenActive$ (): Observable<boolean> { return this.frontend.alternateScreenActive$ }
@@ -229,7 +234,10 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     /**
      * Feeds input into the active session
      */
-    sendInput (data: string) {
+    sendInput (data: string|Buffer) {
+        if (!(data instanceof Buffer)) {
+            data = Buffer.from(data, 'utf-8')
+        }
         this.session.write(data)
         if (this.config.store.terminal.scrollOnInput) {
             this.frontend.scrollToBottom()
@@ -245,7 +253,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             const percentage = percentageMatch[3] ? parseFloat(percentageMatch[2]) : parseInt(percentageMatch[2])
             if (percentage > 0 && percentage <= 100) {
                 this.setProgress(percentage)
-                this.logger.debug('Detected progress:', percentage)
+                // this.logger.debug('Detected progress:', percentage)
             }
         } else {
             this.setProgress(null)
@@ -350,7 +358,9 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             this.frontend.mouseEvent$.subscribe(async event => {
                 if (event.type === 'mousedown') {
                     if (event.which === 2) {
-                        this.paste()
+                        if (this.config.store.terminal.pasteOnMiddleClick) {
+                            this.paste()
+                        }
                         event.preventDefault()
                         event.stopPropagation()
                         return
@@ -405,10 +415,12 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     protected attachSessionHandlers () {
         // this.session.output$.bufferTime(10).subscribe((datas) => {
         this.session.output$.subscribe(data => {
-            this.zone.run(() => {
-                this.output.next(data)
-                this.write(data)
-            })
+            if (this.enablePassthrough) {
+                this.zone.run(() => {
+                    this.output.next(data)
+                    this.write(data)
+                })
+            }
         })
 
         this.sessionCloseSubscription = this.session.closed$.subscribe(() => {

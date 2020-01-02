@@ -5,9 +5,11 @@ import { NgbModule } from '@ng-bootstrap/ng-bootstrap'
 import { ToastrModule } from 'ngx-toastr'
 import TerminusCoreModule, { ToolbarButtonProvider, ConfigProvider, TabRecoveryProvider, HotkeyProvider } from 'terminus-core'
 import { SettingsTabProvider } from 'terminus-settings'
+import TerminusTerminalModule from 'terminus-terminal'
 
 import { EditConnectionModalComponent } from './components/editConnectionModal.component'
 import { SSHModalComponent } from './components/sshModal.component'
+import { SSHPortForwardingModalComponent } from './components/sshPortForwardingModal.component'
 import { PromptModalComponent } from './components/promptModal.component'
 import { SSHSettingsTabComponent } from './components/sshSettingsTab.component'
 import { SSHTabComponent } from './components/sshTab.component'
@@ -26,6 +28,7 @@ import { SSHHotkeyProvider } from './hotkeys'
         FormsModule,
         ToastrModule,
         TerminusCoreModule,
+        TerminusTerminalModule,
     ],
     providers: [
         { provide: ToolbarButtonProvider, useClass: ButtonProvider, multi: true },
@@ -38,6 +41,7 @@ import { SSHHotkeyProvider } from './hotkeys'
         EditConnectionModalComponent,
         PromptModalComponent,
         SSHModalComponent,
+        SSHPortForwardingModalComponent,
         SSHSettingsTabComponent,
         SSHTabComponent,
     ],
@@ -45,6 +49,7 @@ import { SSHHotkeyProvider } from './hotkeys'
         EditConnectionModalComponent,
         PromptModalComponent,
         SSHModalComponent,
+        SSHPortForwardingModalComponent,
         SSHSettingsTabComponent,
         SSHTabComponent,
     ],

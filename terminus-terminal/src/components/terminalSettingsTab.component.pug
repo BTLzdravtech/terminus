@@ -46,6 +46,13 @@ h3.mb-3 Terminal
             input(
                 type='radio',
                 ngbButton,
+                value='off'
+            )
+            | Off
+        label.btn.btn-secondary(ngbButtonLabel)
+            input(
+                type='radio',
+                ngbButton,
                 value='menu'
             )
             | Context menu
@@ -59,10 +66,28 @@ h3.mb-3 Terminal
             
 .form-line
     .header
+        .title Paste on middle-click
+            
+    toggle(
+        [(ngModel)]='config.store.terminal.pasteOnMiddleClick',
+        (ngModelChange)='config.save()',
+    )
+
+.form-line
+    .header
         .title Auto-open a terminal on app start
             
     toggle(
         [(ngModel)]='config.store.terminal.autoOpen',
+        (ngModelChange)='config.save()',
+    )
+
+.form-line
+    .header
+        .title Restore terminal tabs on app start
+            
+    toggle(
+        [(ngModel)]='config.store.terminal.recoverTabs',
         (ngModelChange)='config.save()',
     )
 

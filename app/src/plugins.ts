@@ -12,7 +12,7 @@ function normalizePath (path: string): string {
     return path
 }
 
-nodeRequire.main.paths.map((x: string) => nodeModule.globalPaths.push(normalizePath(x)))
+global['module'].paths.map((x: string) => nodeModule.globalPaths.push(normalizePath(x)))
 
 if (process.env.TERMINUS_DEV) {
     nodeModule.globalPaths.unshift(path.dirname(require('electron').remote.app.getAppPath()))
@@ -156,7 +156,9 @@ export async function findPlugins (): Promise<PluginInfo[]> {
         }
     }
 
-    (window as any).installedPlugins = foundPlugins
+    foundPlugins.sort((a, b) => a.name > b.name ? 1 : -1)
+
+    ;(window as any).installedPlugins = foundPlugins
     return foundPlugins
 }
 

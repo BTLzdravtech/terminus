@@ -60,7 +60,7 @@ export class HTermFrontend extends Frontend {
         this.configuredLinePadding = config.terminal.linePadding
         this.setFontSize()
 
-        preferenceManager.set('font-family', getCSSFontFamily(config.terminal.font))
+        preferenceManager.set('font-family', getCSSFontFamily(config))
         preferenceManager.set('enable-bold', true)
         // preferenceManager.set('audible-bell-sound', '')
         preferenceManager.set('desktop-notification-bell', config.terminal.bell === 'notification')
@@ -182,11 +182,11 @@ export class HTermFrontend extends Frontend {
             this.term.installKeyboard()
             this.term.scrollPort_.setCtrlVPaste(true)
             this.io = this.term.io.push()
-            this.io.onVTKeystroke = this.io.sendString = data => this.input.next(data)
+            this.io.onVTKeystroke = this.io.sendString = data => this.input.next(Buffer.from(data, 'utf-8'))
             this.io.onTerminalResize = (columns, rows) => {
                 this.resize.next({ columns, rows })
             }
-            this.ready.next(null)
+            this.ready.next()
             this.ready.complete()
 
             this.term.scrollPort_.document_.addEventListener('dragOver', event => {

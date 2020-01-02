@@ -25,14 +25,14 @@ class CompletionObserver {
 
     async tick () {
         if (!await this.tab.getCurrentProcess()) {
-            this.done.next(null)
+            this.done.next()
             this.stop()
         }
     }
 
     stop () {
         clearInterval(this.interval)
-        this.destroyed.next(null)
+        this.destroyed.next()
         this.destroyed.complete()
         this.done.complete()
     }
@@ -71,18 +71,31 @@ export class AppService {
         private tabsService: TabsService,
     ) {
         if (hostApp.getWindow().id === 1) {
-            this.tabRecovery.recoverTabs().then(tabs => {
-                for (const tab of tabs) {
-                    this.openNewTabRaw(tab.type, tab.options)
-                }
-                this.tabsChanged$.subscribe(() => {
-                    tabRecovery.saveTabs(this.tabs)
+            if (config.store.terminal.recoverTabs) {
+                this.tabRecovery.recoverTabs().then(tabs => {
+                    for (const tab of tabs) {
+                        this.openNewTabRaw(tab.type, tab.options)
+                    }
+                    this.startTabStorage()
                 })
-                setInterval(() => {
-                    tabRecovery.saveTabs(this.tabs)
-                }, 30000)
-            })
+            } else {
+                /** Continue to store the tabs even if the setting is currently off */
+                this.startTabStorage()
+            }
         }
+
+        hostApp.windowFocused$.subscribe(() => {
+            this._activeTab?.emitFocused()
+        })
+    }
+
+    startTabStorage () {
+        this.tabsChanged$.subscribe(() => {
+            this.tabRecovery.saveTabs(this.tabs)
+        })
+        setInterval(() => {
+            this.tabRecovery.saveTabs(this.tabs)
+        }, 30000)
     }
 
     addTabRaw (tab: BaseTabComponent) {
@@ -144,7 +157,7 @@ export class AppService {
         if (this.tabs.includes(this._activeTab)) {
             this.lastTabIndex = this.tabs.indexOf(this._activeTab)
         } else {
-            this.lastTabIndex = null
+            this.lastTabIndex = 0
         }
         if (this._activeTab) {
             this._activeTab.clearActivity()
@@ -158,6 +171,17 @@ export class AppService {
             })
             this.hostApp.setTitle(this._activeTab.title)
         }
+    }
+
+    getParentTab (tab: BaseTabComponent): SplitTabComponent|null {
+        for (const topLevelTab of this.tabs) {
+            if (topLevelTab instanceof SplitTabComponent) {
+                if (topLevelTab.getAllTabs().includes(tab)) {
+                    return topLevelTab
+                }
+            }
+        }
+        return null
     }
 
     /** Switches between the current tab and the previously active one */
@@ -229,7 +253,7 @@ export class AppService {
 
     /** @hidden */
     emitReady () {
-        this.ready.next(null)
+        this.ready.next()
         this.ready.complete()
         this.hostApp.emitReady()
     }
@@ -246,7 +270,7 @@ export class AppService {
             })
             this.completionObservers.set(tab, observer)
         }
-        return this.completionObservers.get(tab).done$
+        return this.completionObservers.get(tab)!.done$
     }
 
     stopObservingTabCompletion (tab: BaseTabComponent) {

@@ -8,11 +8,12 @@ import { Frontend, SearchOptions } from '../frontends/frontend'
     styles: [require('./searchPanel.component.scss')],
 })
 export class SearchPanelComponent {
-    static globalOptions: SearchOptions = {}
     @Input() query: string
     @Input() frontend: Frontend
     notFound = false
-    options: SearchOptions = SearchPanelComponent.globalOptions
+    options: SearchOptions = {
+        incremental: true,
+    }
 
     @Output() close = new EventEmitter()
 
@@ -20,8 +21,13 @@ export class SearchPanelComponent {
         private toastr: ToastrService,
     ) { }
 
-    findNext () {
-        if (!this.frontend.findNext(this.query, this.options)) {
+    onQueryChange () {
+        this.notFound = false
+        this.findNext(true)
+    }
+
+    findNext (incremental = false) {
+        if (!this.frontend.findNext(this.query, { ...this.options, incremental: incremental || undefined })) {
             this.notFound = true
             this.toastr.error('Not found')
         }

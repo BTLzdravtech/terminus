@@ -7,7 +7,7 @@ import { ConfigProvider } from '../api/configProvider'
 import { ElectronService } from './electron.service'
 import { HostAppService } from './hostApp.service'
 
-const configMerge = (a, b) => require('deepmerge')(a, b, { arrayMerge: (_d, s) => s })
+const configMerge = (a, b) => require('deepmerge')(a, b, { arrayMerge: (_d, s) => s }) // eslint-disable-line @typescript-eslint/no-var-requires
 
 function isStructuralMember (v) {
     return v instanceof Object && !(v instanceof Array) &&
@@ -95,7 +95,7 @@ export class ConfigService {
     private changed = new Subject<void>()
     private _store: any
     private defaults: any
-    private servicesCache: { [id: string]: Function[] } = null
+    private servicesCache: { [id: string]: Function[] }|null = null
 
     get changed$ (): Observable<void> { return this.changed }
 
@@ -170,7 +170,7 @@ export class ConfigService {
      *
      * @typeparam T Base provider type
      */
-    enabledServices<T> (services: T[]): T[] {
+    enabledServices<T extends object> (services: T[]): T[] {
         if (!this.servicesCache) {
             this.servicesCache = {}
             const ngModule = window['rootModule'].ngInjectorDef

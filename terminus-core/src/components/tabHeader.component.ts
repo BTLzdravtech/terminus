@@ -25,7 +25,7 @@ export class TabHeaderComponent {
     @Input() @HostBinding('class.active') active: boolean
     @Input() @HostBinding('class.has-activity') hasActivity: boolean
     @Input() tab: BaseTabComponent
-    @Input() progress: number
+    @Input() progress: number|null
     @ViewChild('handle') handle: ElementRef
 
     private constructor (
@@ -78,12 +78,21 @@ export class TabHeaderComponent {
         this.showRenameTabModal()
     }
 
-    @HostListener('auxclick', ['$event']) async onAuxClick ($event: MouseEvent) {
+    @HostListener('mousedown', ['$event']) async onMouseDown ($event: MouseEvent) {
+        if ($event.which === 2) {
+            $event.preventDefault()
+        }
+    }
+
+    @HostListener('mouseup', ['$event']) async onMouseUp ($event: MouseEvent) {
         if ($event.which === 2) {
             this.app.closeTab(this.tab, true)
         }
+    }
+
+    @HostListener('auxclick', ['$event']) async onAuxClick ($event: MouseEvent) {
         if ($event.which === 3) {
-            event.preventDefault()
+            $event.preventDefault()
 
             const contextMenu = this.electron.remote.Menu.buildFromTemplate(await this.buildContextMenu())
 

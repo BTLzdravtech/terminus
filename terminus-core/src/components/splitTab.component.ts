@@ -33,8 +33,8 @@ export class SplitContainer {
     /**
      * @return Flat list of all tabs inside this container
      */
-    getAllTabs () {
-        let r = []
+    getAllTabs (): BaseTabComponent[] {
+        let r: BaseTabComponent[] = []
         for (const child of this.children) {
             if (child instanceof SplitContainer) {
                 r = r.concat(child.getAllTabs())
@@ -94,7 +94,7 @@ export class SplitContainer {
     }
 
     async serialize () {
-        const children = []
+        const children: any[] = []
         for (const child of this.children) {
             if (child instanceof SplitContainer) {
                 children.push(await child.serialize())
@@ -141,6 +141,8 @@ export interface SplitSpannerInfo {
     styles: [require('./splitTab.component.scss')],
 })
 export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDestroy {
+    static DIRECTIONS: SplitDirection[] = ['t', 'r', 'b', 'l']
+
     /** @hidden */
     @ViewChild('vc', { read: ViewContainerRef }) viewContainer: ViewContainerRef
 
@@ -156,6 +158,7 @@ export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDes
     _spanners: SplitSpannerInfo[] = []
 
     private focusedTab: BaseTabComponent
+    private maximizedTab: BaseTabComponent|null = null
     private hotkeysSubscription: Subscription
     private viewRefs: Map<BaseTabComponent, EmbeddedViewRef<any>> = new Map()
 
@@ -226,6 +229,13 @@ export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDes
                 case 'pane-nav-down':
                     this.navigate('b')
                     break
+                case 'pane-maximize':
+                    if (this.maximizedTab) {
+                        this.maximize(null)
+                    } else if (this.getAllTabs().length > 1) {
+                        this.maximize(this.focusedTab)
+                    }
+                    break
                 case 'close-pane':
                     this.removeTab(this.focusedTab)
                     break
@@ -261,6 +271,10 @@ export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDes
         return this.focusedTab
     }
 
+    getMaximizedTab (): BaseTabComponent|null {
+        return this.maximizedTab
+    }
+
     focus (tab: BaseTabComponent) {
         this.focusedTab = tab
         for (const x of this.getAllTabs()) {
@@ -272,6 +286,15 @@ export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDes
             tab.emitFocused()
             this.focusChanged.next(tab)
         }
+
+        if (this.maximizedTab !== tab) {
+            this.maximizedTab = null
+        }
+        this.layout()
+    }
+
+    maximize (tab: BaseTabComponent|null) {
+        this.maximizedTab = tab
         this.layout()
     }
 
@@ -292,9 +315,9 @@ export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDes
     /**
      * Inserts a new `tab` to the `side` of the `relative` tab
      */
-    addTab (tab: BaseTabComponent, relative: BaseTabComponent, side: SplitDirection) {
-        let target = this.getParentOf(relative) || this.root
-        let insertIndex = target.children.indexOf(relative)
+    addTab (tab: BaseTabComponent, relative: BaseTabComponent|null, side: SplitDirection) {
+        let target = (relative ? this.getParentOf(relative) : null) || this.root
+        let insertIndex = relative ? target.children.indexOf(relative) : -1
 
         if (
             target.orientation === 'v' && ['l', 'r'].includes(side) ||
@@ -302,7 +325,7 @@ export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDes
         ) {
             const newContainer = new SplitContainer()
             newContainer.orientation = target.orientation === 'v' ? 'h' : 'v'
-            newContainer.children = [relative]
+            newContainer.children = relative ? [relative] : []
             newContainer.ratios = [1]
             target.children[insertIndex] = newContainer
             target = newContainer
@@ -333,6 +356,9 @@ export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDes
 
     removeTab (tab: BaseTabComponent) {
         const parent = this.getParentOf(tab)
+        if (!parent) {
+            return
+        }
         const index = parent.children.indexOf(tab)
         parent.ratios.splice(index, 1)
         parent.children.splice(index, 1)
@@ -356,11 +382,18 @@ export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDes
     navigate (dir: SplitDirection) {
         let rel: BaseTabComponent | SplitContainer = this.focusedTab
         let parent = this.getParentOf(rel)
+        if (!parent) {
+            return
+        }
+
         const orientation = ['l', 'r'].includes(dir) ? 'h' : 'v'
 
         while (parent !== this.root && parent.orientation !== orientation) {
             rel = parent
             parent = this.getParentOf(rel)
+            if (!parent) {
+                return
+            }
         }
 
         if (parent.orientation !== orientation) {
@@ -381,13 +414,15 @@ export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDes
 
     async splitTab (tab: BaseTabComponent, dir: SplitDirection) {
         const newTab = await this.tabsService.duplicate(tab)
-        this.addTab(newTab, tab, dir)
+        if (newTab) {
+            this.addTab(newTab, tab, dir)
+        }
     }
 
     /**
      * @returns the immediate parent of `tab`
      */
-    getParentOf (tab: BaseTabComponent | SplitContainer, root?: SplitContainer): SplitContainer {
+    getParentOf (tab: BaseTabComponent | SplitContainer, root?: SplitContainer): SplitContainer|null {
         root = root || this.root
         for (const child of root.children) {
             if (child instanceof SplitContainer) {
@@ -414,14 +449,21 @@ export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDes
     }
 
     /** @hidden */
-    async getCurrentProcess (): Promise<BaseTabProcess> {
-        return (await Promise.all(this.getAllTabs().map(x => x.getCurrentProcess()))).find(x => !!x)
+    async getCurrentProcess (): Promise<BaseTabProcess|null> {
+        return (await Promise.all(this.getAllTabs().map(x => x.getCurrentProcess()))).find(x => !!x) || null
     }
 
     /** @hidden */
     onSpannerAdjusted (spanner: SplitSpannerInfo) {
         this.layout()
         this.splitAdjusted.next(spanner)
+    }
+
+    destroy () {
+        super.destroy()
+        for (const x of this.getAllTabs()) {
+            x.destroy()
+        }
     }
 
     private attachTabView (tab: BaseTabComponent) {
@@ -443,8 +485,10 @@ export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDes
 
     private detachTabView (tab: BaseTabComponent) {
         const ref = this.viewRefs.get(tab)
-        this.viewRefs.delete(tab)
-        this.viewContainer.remove(this.viewContainer.indexOf(ref))
+        if (ref) {
+            this.viewRefs.delete(tab)
+            this.viewContainer.remove(this.viewContainer.indexOf(ref))
+        }
     }
 
     private layout () {
@@ -471,14 +515,22 @@ export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDes
             if (child instanceof SplitContainer) {
                 this.layoutInternal(child, childX, childY, childW, childH)
             } else {
-                const element = this.viewRefs.get(child).rootNodes[0]
-                element.style.position = 'absolute'
+                const element = this.viewRefs.get(child)!.rootNodes[0]
+                element.classList.toggle('child', true)
+                element.classList.toggle('maximized', child === this.maximizedTab)
+                element.classList.toggle('minimized', this.maximizedTab && child !== this.maximizedTab)
+                element.classList.toggle('focused', child === this.focusedTab)
                 element.style.left = `${childX}%`
                 element.style.top = `${childY}%`
                 element.style.width = `${childW}%`
                 element.style.height = `${childH}%`
 
-                element.style.opacity = child === this.focusedTab ? 1 : 0.75
+                if (child === this.maximizedTab) {
+                    element.style.left = '5%'
+                    element.style.top = '5%'
+                    element.style.width = '90%'
+                    element.style.height = '90%'
+                }
             }
             offset += sizes[i]
 
@@ -518,7 +570,7 @@ export class SplitTabComponent extends BaseTabComponent implements OnInit, OnDes
 /** @hidden */
 @Injectable()
 export class SplitTabRecoveryProvider extends TabRecoveryProvider {
-    async recover (recoveryToken: any): Promise<RecoveredTab> {
+    async recover (recoveryToken: any): Promise<RecoveredTab|null> {
         if (recoveryToken && recoveryToken.type === 'app:split-tab') {
             return {
                 type: SplitTabComponent,

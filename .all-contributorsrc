@@ -180,6 +180,60 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "yfwz100",
+      "name": "Wang Zhi",
+      "avatar_url": "https://avatars2.githubusercontent.com/u/983211?v=4",
+      "profile": "http://yfwz100.github.io",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "jack1142",
+      "name": "jack1142",
+      "avatar_url": "https://avatars0.githubusercontent.com/u/6032823?v=4",
+      "profile": "https://github.com/jack1142",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "hdougie",
+      "name": "Howie Douglas",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/450799?v=4",
+      "profile": "https://github.com/hdougie",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "ckaczor",
+      "name": "Chris Kaczor",
+      "avatar_url": "https://avatars2.githubusercontent.com/u/180906?v=4",
+      "profile": "https://chriskaczor.com",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "boxmein",
+      "name": "Johannes Kadak",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/358714?v=4",
+      "profile": "https://www.boxmein.net",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "LeSeulArtichaut",
+      "name": "LeSeulArtichaut",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/38361244?v=4",
+      "profile": "https://github.com/LeSeulArtichaut",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
@@ -187,5 +241,6 @@
   "projectOwner": "Eugeny",
   "repoType": "github",
   "repoHost": "https://github.com",
-  "commitConvention": "none"
+  "commitConvention": "none",
+  "skipCi": true
 }

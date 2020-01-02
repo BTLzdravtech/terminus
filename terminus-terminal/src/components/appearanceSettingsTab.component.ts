@@ -19,7 +19,7 @@ export class AppearanceSettingsTabComponent {
     fonts: string[] = []
     colorSchemes: TerminalColorScheme[] = []
     equalComparator = deepEqual
-    editingColorScheme: TerminalColorScheme
+    editingColorScheme: TerminalColorScheme|null = null
     schemeChanged = false
 
     constructor (
@@ -32,7 +32,11 @@ export class AppearanceSettingsTabComponent {
     async ngOnInit () {
         if (this.hostApp.platform === Platform.Windows || this.hostApp.platform === Platform.macOS) {
             const fonts = await new Promise<any[]>((resolve) => fontManager.findFonts({ monospace: true }, resolve))
-            this.fonts = fonts.map(x => `${x.family} ${x.style}`.trim())
+            if (this.hostApp.platform === Platform.Windows) {
+                this.fonts = fonts.map(x => `${x.family} ${x.style}`.trim())
+            } else {
+                this.fonts = fonts.map(x => x.family.trim())
+            }
             this.fonts.sort()
         }
         if (this.hostApp.platform === Platform.Linux) {
@@ -64,7 +68,7 @@ export class AppearanceSettingsTabComponent {
 
     saveScheme () {
         let schemes = this.config.store.terminal.customColorSchemes
-        schemes = schemes.filter(x => x !== this.editingColorScheme && x.name !== this.editingColorScheme.name)
+        schemes = schemes.filter(x => x !== this.editingColorScheme && x.name !== this.editingColorScheme!.name)
         schemes.push(this.editingColorScheme)
         this.config.store.terminal.customColorSchemes = schemes
         this.config.save()
@@ -101,6 +105,6 @@ export class AppearanceSettingsTabComponent {
     }
 
     getPreviewFontFamily () {
-        return getCSSFontFamily(this.config.store.terminal.font)
+        return getCSSFontFamily(this.config.store)
     }
 }

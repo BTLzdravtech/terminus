@@ -66,7 +66,7 @@ export class EditConnectionModalComponent {
         modal.componentInstance.password = true
         try {
             const result = await modal.result
-            if (result && result.value) {
+            if (result?.value) {
                 this.passwordStorage.savePassword(this.connection, result.value)
                 this.hasSavedPassword = true
             }
@@ -79,20 +79,21 @@ export class EditConnectionModalComponent {
     }
 
     selectPrivateKey () {
-        const path = this.electron.dialog.showOpenDialog(
+        this.electron.dialog.showOpenDialog(
             this.hostApp.getWindow(),
             {
                 title: 'Select private key',
             }
-        )
-        if (path) {
-            this.connection.privateKey = path[0]
-        }
+        ).then(result => {
+            if (result.filePaths) {
+                this.connection.privateKey = result.filePaths[0]
+            }
+        })
     }
 
     save () {
         for (const k of Object.values(SSHAlgorithmType)) {
-            this.connection.algorithms[k] = Object.entries(this.algorithms[k])
+            this.connection.algorithms![k] = Object.entries(this.algorithms[k])
                 .filter(([_k, v]) => !!v)
                 .map(([k, _v]) => k)
         }
@@ -104,6 +105,9 @@ export class EditConnectionModalComponent {
     }
 
     moveScriptUp (script: LoginScript) {
+        if (!this.connection.scripts) {
+            this.connection.scripts = []
+        }
         const index = this.connection.scripts.indexOf(script)
         if (index > 0) {
             this.connection.scripts.splice(index, 1)
@@ -112,6 +116,9 @@ export class EditConnectionModalComponent {
     }
 
     moveScriptDown (script: LoginScript) {
+        if (!this.connection.scripts) {
+            this.connection.scripts = []
+        }
         const index = this.connection.scripts.indexOf(script)
         if (index >= 0 && index < this.connection.scripts.length - 1) {
             this.connection.scripts.splice(index, 1)
@@ -120,7 +127,7 @@ export class EditConnectionModalComponent {
     }
 
     async deleteScript (script: LoginScript) {
-        if ((await this.electron.showMessageBox(
+        if (this.connection.scripts && (await this.electron.showMessageBox(
             this.hostApp.getWindow(),
             {
                 type: 'warning',
@@ -135,6 +142,9 @@ export class EditConnectionModalComponent {
     }
 
     addScript () {
+        if (!this.connection.scripts) {
+            this.connection.scripts = []
+        }
         this.connection.scripts.push({ expect: '', send: '' })
     }
 }

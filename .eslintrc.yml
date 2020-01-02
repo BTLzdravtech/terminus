@@ -36,6 +36,7 @@ rules:
   '@typescript-eslint/require-await': off
   '@typescript-eslint/strict-boolean-expressions': off
   '@typescript-eslint/no-misused-promises': off
+  '@typescript-eslint/typedef': off
   '@typescript-eslint/no-use-before-define':
   - error
   - classes: false
@@ -44,7 +45,8 @@ rules:
   - error
   - never
   block-scoped-var: error
-  brace-style:
+  brace-style: off
+  '@typescript-eslint/brace-style':
   - error
   - 1tbs
   - allowSingleLine: true
@@ -85,3 +87,14 @@ rules:
   - as-needed
   - keywords: true
     numbers: true
+  quotes: off
+  '@typescript-eslint/quotes':
+  - error
+  - single
+  - allowTemplateLiterals: true
+  '@typescript-eslint/no-non-null-assertion': off
+  '@typescript-eslint/no-unnecessary-condition': off
+  '@typescript-eslint/no-untyped-public-signature': off # bugs out on constructors
+  '@typescript-eslint/restrict-template-expressions': off
+  '@typescript-eslint/no-dynamic-delete': off
+  '@typescript-eslint/prefer-nullish-coalescing': off

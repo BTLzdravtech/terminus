@@ -37,6 +37,7 @@ import { TerminalHotkeyProvider } from './hotkeys'
 import { HyperColorSchemes } from './colorSchemes'
 import { NewTabContextMenu, CopyPasteContextMenu } from './contextMenu'
 import { SaveAsProfileContextMenu } from './tabContextMenu'
+import { ZModemDecorator } from './zmodem'
 
 import { CmderShellProvider } from './shells/cmder'
 import { CustomShellProvider } from './shells/custom'
@@ -76,6 +77,7 @@ import { XTermFrontend, XTermWebGLFrontend } from './frontends/xtermFrontend'
         { provide: HotkeyProvider, useClass: TerminalHotkeyProvider, multi: true },
         { provide: TerminalColorSchemeProvider, useClass: HyperColorSchemes, multi: true },
         { provide: TerminalDecorator, useClass: PathDropDecorator, multi: true },
+        { provide: TerminalDecorator, useClass: ZModemDecorator, multi: true },
 
         { provide: ShellProvider, useClass: WindowsDefaultShellProvider, multi: true },
         { provide: ShellProvider, useClass: MacOSDefaultShellProvider, multi: true },
@@ -120,6 +122,7 @@ import { XTermFrontend, XTermWebGLFrontend } from './frontends/xtermFrontend'
     exports: [
         ColorPickerComponent,
         EnvironmentEditorComponent,
+        SearchPanelComponent,
     ],
 })
 export default class TerminalModule { // eslint-disable-line @typescript-eslint/no-extraneous-class
@@ -162,7 +165,7 @@ export default class TerminalModule { // eslint-disable-line @typescript-eslint/
                 argv = argv.slice(1)
             }
 
-            if(require('yargs').parse(argv.slice(1))._[0] !== "open"){
+            if(require('yargs').parse(argv.slice(1))._[0] !== 'open'){
                 app.ready$.subscribe(() => {
                     terminal.openTab()
                 })
@@ -188,7 +191,7 @@ export default class TerminalModule { // eslint-disable-line @typescript-eslint/
         hostApp.cliOpenDirectory$.subscribe(async directory => {
             if (await fs.exists(directory)) {
                 if ((await fs.stat(directory)).isDirectory()) {
-                    terminal.openTab(null, directory)
+                    terminal.openTab(undefined, directory)
                     hostApp.bringToFront()
                 }
             }
