@@ -1,0 +1,399 @@
+@import "./theme.vars";
+
+// ---------
+
+
+
+$button-hover-bg: rgba(0, 0, 0, .25);
+$button-active-bg: rgba(0, 0, 0, .5);
+
+@import '~bootstrap/scss/bootstrap.scss';
+
+window-controls {
+    svg {
+        transition: 0.25s fill;
+        fill: #aaa;
+    }
+
+    button:hover svg {
+        fill: white;
+    }
+
+    .btn-close:hover {
+        background: #8a2828;
+    }
+}
+
+$border-color: #111;
+
+body {
+    background: $body-bg;
+
+    &.vibrant {
+        background: rgba(0,0,0,.4);
+    }
+}
+
+app-root  {
+    &.no-tabs {
+        background: rgba(0,0,0,.5);
+    }
+
+    &> .content {
+        .tab-bar {
+            .btn-tab-bar {
+                background: transparent;
+                &:hover { background: rgba(0, 0, 0, .25) !important; }
+                &:active { background: rgba(0, 0, 0, .5) !important; }
+
+                &::after {
+                    display: none;
+                }
+            }
+
+            &>.tabs {
+                tab-header {
+                    border-left: 1px solid transparent;
+                    border-right: 1px solid transparent;
+
+                    transition: 0.125s ease-out width;
+
+                    .index {
+                        color: rgba(255, 255, 255, 0.4);
+                    }
+
+                    button {
+                        color: $body-color;
+                        border: none;
+                        transition: 0.25s all;
+
+                        &:hover { background: $button-hover-bg !important; }
+                        &:active { background: $button-active-bg !important; }
+                    }
+
+                    .progressbar {
+                        background: $green;
+                    }
+
+                    &.active {
+                        color: white;
+                        background: $content-bg;
+                        border-left: 1px solid $border-color;
+                        border-right: 1px solid $border-color;
+                    }
+
+                    .name {
+                        text-align: center;
+                    }
+                }
+            }
+        }
+
+        &.tabs-on-top .tab-bar {
+            &>.background {
+                border-bottom: 1px solid $border-color;
+            }
+
+            tab-header {
+                border-bottom: 1px solid $border-color;
+
+                &.active {
+                    border-bottom-color: transparent;
+                }
+
+                &.has-activity:not(.active) {
+                    background: linear-gradient(to bottom, rgba(208, 0, 0, 0) 95%, #1aa99c 100%);
+                }
+            }
+        }
+
+        &:not(.tabs-on-top) .tab-bar {
+            &>.background {
+                border-top: 1px solid $border-color;
+            }
+
+            tab-header {
+                border-top: 1px solid $border-color;
+
+                &.active {
+                    margin-top: -1px;
+                }
+
+                &.has-activity:not(.active) {
+                    background: linear-gradient(to top, rgba(208, 0, 0, 0) 95%, #1aa99c 100%);
+                }
+            }
+        }
+    }
+
+    &.platform-win32, &.platform-linux {
+        border: 1px solid #111;
+        &>.content .tab-bar .tabs tab-header:first-child {
+            border-left: none;
+        }
+    }
+}
+
+tab-body {
+    background: $content-bg;
+}
+
+settings-tab > ngb-tabset {
+    border-right: 1px solid $body-bg;
+
+    & > .nav {
+        background: rgba(0, 0, 0, 0.25);
+        flex-shrink: 0;
+
+        & > .nav-item > .nav-link {
+            border: none;
+            padding: 10px 50px 10px 20px;
+            font-size: 14px;
+            border-radius: 0;
+
+            &:not(.active) {
+                color: $body-color;
+
+                &:hover {
+                    color: $white;
+                }
+            }
+        }
+    }
+}
+
+multi-hotkey-input {
+    .item {
+        background: $body-bg2;
+        border: 1px solid $blue;
+        border-radius: 3px;
+        margin-right: 5px;
+
+        .body {
+            padding: 3px 0 2px;
+
+            .stroke {
+                padding: 0 6px;
+                border-right: 1px solid $content-bg;
+            }
+        }
+
+        .remove {
+            padding: 3px 8px 2px;
+        }
+    }
+
+    .add {
+        color: #777;
+        padding: 4px 10px 0;
+    }
+
+    .add, .item .body, .item .remove {
+        &:hover { background: darken($body-bg2, 5%); }
+        &:active { background: darken($body-bg2, 15%); }
+    }
+}
+
+hotkey-input-modal {
+    .input {
+        background: $input-bg;
+        padding: 10px;
+        font-size: 24px;
+        line-height: 27px;
+        height: 55px;
+
+        .stroke {
+            background: $body-bg2;
+            border: 1px solid $blue;
+            border-radius: 3px;
+            margin-right: 10px;
+            padding: 3px 10px;
+        }
+    }
+
+    .timeout {
+        background: $input-bg;
+
+        div {
+            background: $blue;
+        }
+    }
+}
+
+.form-group label {
+    margin-bottom: 2px;
+}
+
+ngb-tabset .tab-content {
+    padding-top: 20px;
+}
+
+[ngbradiogroup] > label.active {
+    background: $blue;
+}
+
+.btn {
+    i + * {
+        margin-left: 5px;
+    }
+
+    &.btn-lg i + * {
+        margin-left: 10px;
+    }
+}
+
+.input-group-addon + .form-control {
+    border-left: none;
+}
+
+.input-group > select.form-control {
+    flex-direction: row;
+}
+
+.list-group-item {
+    transition: 0.25s background;
+
+    i + * {
+        margin-left: 10px;
+    }
+}
+
+.list-group.list-group-flush .list-group-item:not(.list-group-item-action) {
+    background: transparent;
+    border-color: rgba(0, 0, 0, 0.2);
+
+    &:not(:last-child) {
+        border-bottom: none;
+    }
+}
+
+checkbox i.on {
+    color: $blue;
+}
+
+.modal .modal-footer {
+    background: rgba(0, 0, 0, .25);
+
+    .btn {
+        font-weight: bold;
+        padding: 0.375rem 1.5rem;
+    }
+}
+
+.list-group-item svg {
+    fill: white;
+    fill-opacity: 0.75;
+}
+
+*::-webkit-scrollbar {
+    background: rgba(0, 0, 0, .125);
+    width: 10px;
+    margin: 5px;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, .25);
+}
+
+*::-webkit-scrollbar-corner,
+*::-webkit-resizer {
+    opacity: 0;
+}
+
+search-panel {
+    background: rgba(39, 49, 60, 0.65) !important;
+}
+
+
+.btn {
+    cursor: pointer;
+    justify-content: flex-start;
+    overflow: hidden;
+
+    &.disabled,
+    &:disabled {
+        cursor: not-allowed;
+    }
+}
+
+.btn.btn-outline-secondary {
+    @include button-outline-variant(#9badb9, #fff);
+    &:hover:not([disabled]), &:active:not([disabled]), &.active:not([disabled]) {
+        background-color: #3f484e;
+        border-color: darken(#9badb9, 25%);
+    }
+
+    border-color: darken(#9badb9, 25%);
+
+    &.disabled,
+    &:disabled {
+        color: #9badb9;
+    }
+}
+
+.btn-warning:not(:disabled):not(.disabled) {
+    &.active, &:active {
+        color: $gray-900;
+    }
+}
+
+.btn-secondary:not(:disabled):not(.disabled) {
+    &.active, &:active {
+        background: #191e23;
+    }
+}
+
+.btn-link {
+    &:hover, &[aria-expanded=true], &:active, &.active {
+        color: $link-hover-color;
+        border-radius: $btn-border-radius;
+    }
+
+    &[aria-expanded=true], &:active, &.active {
+        background: rgba(255, 255, 255, 0.1);
+    }
+}
+
+.btn-group .btn.active {
+    border-color: transparent !important;
+}
+
+.nav-tabs {
+    margin-bottom: 10px;
+
+    &.nav-justified .nav-link {
+        margin-right: 5px;
+    }
+
+    .nav-link {
+        border: none;
+        border-bottom: $nav-tabs-border-width solid transparent;
+        text-transform: uppercase;
+        font-weight: bold;
+        padding: 5px 0;
+        margin-right: 20px;
+
+        uib-tab-heading > i {
+            font-size: 18px;
+        }
+
+        @include hover-focus {
+            color: $nav-tabs-link-active-color;
+        }
+
+        &.disabled {
+            color: $nav-link-disabled-color;
+            border-color: transparent;
+        }
+    }
+
+    .nav-item:last-child .nav-link {
+        margin-right: 0;
+    }
+
+    .nav-link.active,
+    .nav-item.show .nav-link {
+        color: $nav-tabs-link-active-color;
+        border-color: $nav-tabs-link-active-border-color;
+    }
+}
