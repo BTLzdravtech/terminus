@@ -72,7 +72,7 @@ app-root  {
                     }
 
                     .progressbar {
-                        background: $green;
+                        background: $blue;
                     }
 
                     &.active {
@@ -102,7 +102,7 @@ app-root  {
                 }
 
                 &.has-activity:not(.active) {
-                    background: linear-gradient(to bottom, rgba(208, 0, 0, 0) 95%, #1aa99c 100%);
+                    background: linear-gradient(to bottom, rgba(208, 0, 0, 0) 95%, $blue 100%);
                 }
             }
         }
@@ -120,7 +120,7 @@ app-root  {
                 }
 
                 &.has-activity:not(.active) {
-                    background: linear-gradient(to top, rgba(208, 0, 0, 0) 95%, #1aa99c 100%);
+                    background: linear-gradient(to top, rgba(208, 0, 0, 0) 95%, $blue 100%);
                 }
             }
         }
