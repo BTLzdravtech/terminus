@@ -38,7 +38,7 @@ module.exports = function patchPTYModule (mod) {
     }
 
     terminal.on('data', data => {
-        buffer = Buffer.concat([buffer, data])
+        buffer += data
         if (Date.now() - lastFlush > maxWindow) {
             // Taking too much time buffering, flush to keep things interactive
             flush()
