@@ -22,24 +22,29 @@ export class HomeBaseService {
         }
     }
 
-    openGitHub () {
+    openGitHub (): void {
         this.electron.shell.openExternal('https://github.com/eugeny/terminus')
     }
 
-    reportBug () {
+    reportBug (): void {
         let body = `Version: ${this.appVersion}\n`
         body += `Platform: ${os.platform()} ${os.release()}\n`
         const label = {
+            aix: 'OS: IBM AIX',
+            android: 'OS: Android',
             darwin: 'OS: macOS',
-            windows: 'OS: Windows',
+            freebsd: 'OS: FreeBSD',
             linux: 'OS: Linux',
+            openbsd: 'OS: OpenBSD',
+            sunos: 'OS: Solaris',
+            win32: 'OS: Windows',
         }[os.platform()]
         const plugins = (window as any).installedPlugins.filter(x => !x.isBuiltin).map(x => x.name)
         body += `Plugins: ${plugins.join(', ') || 'none'}\n\n`
         this.electron.shell.openExternal(`https://github.com/eugeny/terminus/issues/new?body=${encodeURIComponent(body)}&labels=${label}`)
     }
 
-    enableAnalytics () {
+    enableAnalytics (): void {
         if (!window.localStorage.analyticsUserID) {
             window.localStorage.analyticsUserID = uuidv4()
         }
@@ -51,7 +56,7 @@ export class HomeBaseService {
         this.mixpanel.track('launch', this.getAnalyticsProperties())
     }
 
-    getAnalyticsProperties () {
+    getAnalyticsProperties (): Record<string, string> {
         return {
             distinct_id: window.localStorage.analyticsUserID, // eslint-disable-line @typescript-eslint/camelcase
             platform: process.platform,

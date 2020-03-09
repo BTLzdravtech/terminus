@@ -1,3 +1,4 @@
+import colors from 'ansi-colors'
 import { BaseSession } from 'terminus-terminal'
 import { Server, Socket, createServer, createConnection } from 'net'
 import { Client, ClientChannel } from 'ssh2'
@@ -32,6 +33,7 @@ export interface SSHConnection {
     readyTimeout?: number
     color?: string
     x11?: boolean
+    skipBanner?: boolean
 
     algorithms?: {[t: string]: string[]}
 }
@@ -58,11 +60,11 @@ export class ForwardedPort {
         })
     }
 
-    stopLocalListener () {
+    stopLocalListener (): void {
         this.listener.close()
     }
 
-    toString () {
+    toString (): string {
         if (this.type === PortForwardType.Local) {
             return `(local) ${this.host}:${this.port} → (remote) ${this.targetAddress}:${this.targetPort}`
         } else {
@@ -86,13 +88,13 @@ export class SSHSession extends BaseSession {
         this.scripts = connection.scripts || []
     }
 
-    async start () {
+    async start (): Promise<void> {
         this.open = true
 
         try {
             this.shell = await this.openShellChannel({ x11: this.connection.x11 })
         } catch (err) {
-            this.emitServiceMessage(`Remote rejected opening a shell channel: ${err}`)
+            this.emitServiceMessage(colors.bgRed.black(' X ') + ` Remote rejected opening a shell channel: ${err}`)
         }
 
         this.shell.on('greeting', greeting => {
@@ -159,13 +161,13 @@ export class SSHSession extends BaseSession {
             this.logger.info(`Incoming forwarded connection: (remote) ${details.srcIP}:${details.srcPort} -> (local) ${details.destIP}:${details.destPort}`)
             const forward = this.forwardedPorts.find(x => x.port === details.destPort)
             if (!forward) {
-                this.emitServiceMessage(`Rejected incoming forwarded connection for unrecognized port ${details.destPort}`)
+                this.emitServiceMessage(colors.bgRed.black(' X ') + ` Rejected incoming forwarded connection for unrecognized port ${details.destPort}`)
                 return reject()
             }
             const socket = new Socket()
             socket.connect(forward.targetPort, forward.targetAddress)
             socket.on('error', e => {
-                this.emitServiceMessage(`Could not forward the remote connection to ${forward.targetAddress}:${forward.targetPort}: ${e}`)
+                this.emitServiceMessage(colors.bgRed.black(' X ') + ` Could not forward the remote connection to ${forward.targetAddress}:${forward.targetPort}: ${e}`)
                 reject()
             })
             socket.on('connect', () => {
@@ -195,7 +197,7 @@ export class SSHSession extends BaseSession {
                 socket.connect(xPort, xHost)
             }
             socket.on('error', e => {
-                this.emitServiceMessage(`Could not connect to the X server ${xHost}:${xPort}: ${e}`)
+                this.emitServiceMessage(colors.bgRed.black(' X ') + ` Could not connect to the X server ${xHost}:${xPort}: ${e}`)
                 reject()
             })
             socket.on('connect', () => {
@@ -215,12 +217,12 @@ export class SSHSession extends BaseSession {
         this.executeUnconditionalScripts()
     }
 
-    emitServiceMessage (msg: string) {
+    emitServiceMessage (msg: string): void {
         this.serviceMessage.next(msg)
         this.logger.info(msg)
     }
 
-    async addPortForward (fw: ForwardedPort) {
+    async addPortForward (fw: ForwardedPort): Promise<void> {
         if (fw.type === PortForwardType.Local) {
             await fw.startLocalListener((socket: Socket) => {
                 this.logger.info(`New connection on ${fw}`)
@@ -231,7 +233,7 @@ export class SSHSession extends BaseSession {
                     fw.targetPort,
                     (err, stream) => {
                         if (err) {
-                            this.emitServiceMessage(`Remote has rejected the forwaded connection via ${fw}: ${err}`)
+                            this.emitServiceMessage(colors.bgRed.black(' X ') + ` Remote has rejected the forwaded connection via ${fw}: ${err}`)
                             socket.destroy()
                             return
                         }
@@ -246,10 +248,10 @@ export class SSHSession extends BaseSession {
                     }
                 )
             }).then(() => {
-                this.emitServiceMessage(`Forwaded ${fw}`)
+                this.emitServiceMessage(colors.bgGreen.black(' -> ') + ` Forwaded ${fw}`)
                 this.forwardedPorts.push(fw)
             }).catch(e => {
-                this.emitServiceMessage(`Failed to forward port ${fw}: ${e}`)
+                this.emitServiceMessage(colors.bgRed.black(' X ') + ` Failed to forward port ${fw}: ${e}`)
                 throw e
             })
         }
@@ -257,18 +259,18 @@ export class SSHSession extends BaseSession {
             await new Promise((resolve, reject) => {
                 this.ssh.forwardIn(fw.host, fw.port, err => {
                     if (err) {
-                        this.emitServiceMessage(`Remote rejected port forwarding for ${fw}: ${err}`)
+                        this.emitServiceMessage(colors.bgRed.black(' X ') + ` Remote rejected port forwarding for ${fw}: ${err}`)
                         return reject(err)
                     }
                     resolve()
                 })
             })
-            this.emitServiceMessage(`Forwaded ${fw}`)
+            this.emitServiceMessage(colors.bgGreen.black(' <- ') + ` Forwaded ${fw}`)
             this.forwardedPorts.push(fw)
         }
     }
 
-    async removePortForward (fw: ForwardedPort) {
+    async removePortForward (fw: ForwardedPort): Promise<void> {
         if (fw.type === PortForwardType.Local) {
             fw.stopLocalListener()
             this.forwardedPorts = this.forwardedPorts.filter(x => x !== fw)
@@ -280,19 +282,19 @@ export class SSHSession extends BaseSession {
         this.emitServiceMessage(`Stopped forwarding ${fw}`)
     }
 
-    resize (columns, rows) {
+    resize (columns: number, rows: number): void {
         if (this.shell) {
             this.shell.setWindow(rows, columns, rows, columns)
         }
     }
 
-    write (data) {
+    write (data: Buffer): void {
         if (this.shell) {
-            this.shell.write(data)
+            this.shell.write(data.toString())
         }
     }
 
-    kill (signal?: string) {
+    kill (signal?: string): void {
         if (this.shell) {
             this.shell.signal(signal || 'TERM')
         }

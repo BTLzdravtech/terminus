@@ -1,3 +1,4 @@
+import './portable'
 import './sentry'
 import './lru'
 import { app, ipcMain, Menu } from 'electron'
@@ -58,8 +59,8 @@ app.on('ready', () => {
                 label: 'New window',
                 click () {
                     this.app.newWindow()
-                }
-            }
+                },
+            },
         ]))
     }
     application.init()

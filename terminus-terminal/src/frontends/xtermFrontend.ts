@@ -1,10 +1,12 @@
+import { getCSSFontFamily } from 'terminus-core'
 import { Frontend, SearchOptions } from './frontend'
 import { Terminal, ITheme } from 'xterm'
-import { getCSSFontFamily } from '../utils'
 import { FitAddon } from 'xterm-addon-fit'
 import { LigaturesAddon } from 'xterm-addon-ligatures'
 import { SearchAddon } from 'xterm-addon-search'
 import { WebglAddon } from 'xterm-addon-webgl'
+import { Unicode11Addon } from 'xterm-addon-unicode11'
+import { SerializeAddon } from 'xterm-addon-serialize'
 import './xterm.css'
 import deepEqual from 'deep-equal'
 import { Attributes } from 'xterm/src/common/buffer/Constants'
@@ -23,12 +25,14 @@ export class XTermFrontend extends Frontend {
     protected enableWebGL = false
     private xterm: Terminal
     private configuredFontSize = 0
+    private configuredLinePadding = 0
     private zoom = 0
     private resizeHandler: () => void
     private configuredTheme: ITheme = {}
     private copyOnSelect = false
     private search = new SearchAddon()
     private fitAddon = new FitAddon()
+    private serializeAddon = new SerializeAddon()
     private ligaturesAddon: LigaturesAddon
     private opened = false
 
@@ -56,7 +60,11 @@ export class XTermFrontend extends Frontend {
                 this.copySelection()
             }
         })
+
         this.xterm.loadAddon(this.fitAddon)
+        this.xterm.loadAddon(this.serializeAddon)
+        this.xterm.loadAddon(new Unicode11Addon())
+        this.xterm.unicode.activeVersion = '11'
 
         const keyboardEventHandler = (name: string, event: KeyboardEvent) => {
             this.hotkeysService.pushKeystroke(name, event)
@@ -208,6 +216,7 @@ export class XTermFrontend extends Frontend {
         this.xterm.setOption('macOptionIsMeta', config.terminal.altIsMeta)
         this.xterm.setOption('scrollback', 100000)
         this.configuredFontSize = config.terminal.fontSize
+        this.configuredLinePadding = config.terminal.linePadding
         this.setFontSize()
 
         this.copyOnSelect = config.terminal.copyOnSelect
@@ -246,8 +255,19 @@ export class XTermFrontend extends Frontend {
         return this.search.findPrevious(term, searchOptions)
     }
 
+    saveState (): any {
+        return this.serializeAddon.serialize(1000)
+    }
+
+    restoreState (state: string): void {
+        this.xterm.write(state)
+    }
+
     private setFontSize () {
-        this.xterm.setOption('fontSize', this.configuredFontSize * Math.pow(1.1, this.zoom))
+        const scale = Math.pow(1.1, this.zoom)
+        this.xterm.setOption('fontSize', this.configuredFontSize * scale)
+        // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
+        this.xterm.setOption('lineHeight', (this.configuredFontSize + this.configuredLinePadding * 2) / this.configuredFontSize)
         this.resizeHandler()
     }
 

@@ -1,19 +1,21 @@
+import colors from 'ansi-colors'
+import { open as openTemp } from 'temp'
 import { Injectable, NgZone } from '@angular/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { Client } from 'ssh2'
 import * as fs from 'mz/fs'
+import { execFile } from 'mz/child_process'
 import * as path from 'path'
 import * as sshpk from 'sshpk'
 import { ToastrService } from 'ngx-toastr'
-import { AppService, HostAppService, Platform, Logger, LogService } from 'terminus-core'
+import { HostAppService, Platform, Logger, LogService, ElectronService } from 'terminus-core'
 import { SSHConnection, SSHSession } from '../api'
 import { PromptModalComponent } from '../components/promptModal.component'
-import { SSHTabComponent } from '../components/sshTab.component'
 import { PasswordStorageService } from './passwordStorage.service'
 import { SSH2Stream } from 'ssh2-streams'
 
 try {
-    var windowsProcessTreeNative = require('windows-process-tree/build/Release/windows_process_tree.node') // eslint-disable-line @typescript-eslint/no-var-requires
+    var windowsProcessTreeNative = require('windows-process-tree/build/Release/windows_process_tree.node') // eslint-disable-line @typescript-eslint/no-var-requires, no-var
 } catch { }
 
 @Injectable({ providedIn: 'root' })
@@ -22,7 +24,7 @@ export class SSHService {
 
     private constructor (
         private log: LogService,
-        private app: AppService,
+        private electron: ElectronService,
         private zone: NgZone,
         private ngbModal: NgbModal,
         private hostApp: HostAppService,
@@ -30,17 +32,6 @@ export class SSHService {
         private toastr: ToastrService,
     ) {
         this.logger = log.create('ssh')
-    }
-
-    async openTab (connection: SSHConnection): Promise<SSHTabComponent> {
-        const tab = this.zone.run(() => this.app.openNewTab(
-            SSHTabComponent,
-            { connection }
-        ) as SSHTabComponent)
-        if (connection.color) {
-            (this.app.getParentTab(tab) || tab).color = connection.color
-        }
-        return tab
     }
 
     createSession (connection: SSHConnection): SSHSession {
@@ -65,17 +56,17 @@ export class SSHService {
         if (!privateKeyPath) {
             const userKeyPath = path.join(process.env.HOME as string, '.ssh', 'id_rsa')
             if (await fs.exists(userKeyPath)) {
-                log(`Using user's default private key: ${userKeyPath}`)
+                log('Using user\'s default private key')
                 privateKeyPath = userKeyPath
             }
         }
 
         if (privateKeyPath) {
-            log(`Loading private key from ${privateKeyPath}`)
+            log('Loading private key from ' + colors.bgWhite.blackBright(' ' + privateKeyPath + ' '))
             try {
                 privateKey = (await fs.readFile(privateKeyPath)).toString()
             } catch (error) {
-                log('Could not read the private key file')
+                log(colors.bgRed.black(' X ') + 'Could not read the private key file')
                 this.toastr.error('Could not read the private key file')
             }
 
@@ -86,7 +77,7 @@ export class SSHService {
                 } catch (e) {
                     if (e instanceof sshpk.KeyEncryptedError) {
                         const modal = this.ngbModal.open(PromptModalComponent)
-                        log('Key requires passphrase')
+                        log(colors.bgYellow.yellow.black(' ! ') + ' Key requires passphrase')
                         modal.componentInstance.prompt = 'Private key passphrase'
                         modal.componentInstance.password = true
                         let passphrase = ''
@@ -104,7 +95,31 @@ export class SSHService {
                     }
                 }
 
-                privateKey = parsedKey!.toString('ssh')
+                const sshFormatKey = parsedKey!.toString('openssh')
+                const temp = await openTemp()
+                fs.close(temp.fd)
+                await fs.writeFile(temp.path, sshFormatKey)
+
+                let sshKeygenPath = 'ssh-keygen'
+                if (this.hostApp.platform === Platform.Windows) {
+                    sshKeygenPath = path.join(
+                        path.dirname(this.electron.app.getPath('exe')),
+                        'resources',
+                        'extras',
+                        'ssh-keygen',
+                        'ssh-keygen.exe',
+                    )
+                    await execFile('icacls', [temp.path, '/inheritance:r'])
+                    await execFile('icacls', [temp.path, '/grant:r', `${process.env.USERNAME}:(R,W)`])
+                }
+
+                await execFile(sshKeygenPath, [
+                    '-p', '-P', '', '-N', '', '-m', 'PEM', '-f',
+                    temp.path,
+                ])
+
+                privateKey = await fs.readFile(temp.path, { encoding: 'utf-8' })
+                fs.unlink(temp.path)
             }
         }
 
@@ -133,7 +148,7 @@ export class SSHService {
                 })
             })
             ssh.on('keyboard-interactive', (name, instructions, instructionsLang, prompts, finish) => this.zone.run(async () => {
-                log(`Keyboard-interactive auth requested: ${name}`)
+                log(colors.bgBlackBright(' ') + ` Keyboard-interactive auth requested: ${name}`)
                 this.logger.info('Keyboard-interactive auth:', name, instructions, instructionsLang)
                 const results: string[] = []
                 for (const prompt of prompts) {
@@ -147,11 +162,15 @@ export class SSHService {
             }))
 
             ssh.on('greeting', greeting => {
-                log('Greeting: ' + greeting)
+                if (!session.connection.skipBanner) {
+                    log('Greeting: ' + greeting)
+                }
             })
 
             ssh.on('banner', banner => {
-                log('Banner: \n' + banner)
+                if (!session.connection.skipBanner) {
+                    log(banner)
+                }
             })
 
             let agent: string|null = null
@@ -182,7 +201,8 @@ export class SSHService {
                     keepaliveCountMax: session.connection.keepaliveCountMax,
                     readyTimeout: session.connection.readyTimeout,
                     hostVerifier: digest => {
-                        log('SHA256 fingerprint: ' + digest)
+                        log(colors.bgWhite(' ') + ' Host key fingerprint:')
+                        log(colors.bgWhite(' ') + ' ' + colors.black.bgWhite(' SHA256 ') + colors.bgBlackBright(' ' + digest + ' '))
                         return true
                     },
                     hostHash: 'sha256' as any,

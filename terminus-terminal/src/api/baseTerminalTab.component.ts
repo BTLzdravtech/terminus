@@ -1,9 +1,10 @@
 import { Observable, Subject, Subscription } from 'rxjs'
 import { first } from 'rxjs/operators'
 import { ToastrService } from 'ngx-toastr'
-import { NgZone, OnInit, OnDestroy, Inject, Injector, Optional, ViewChild, HostBinding, Input, ElementRef } from '@angular/core'
+import colors from 'ansi-colors'
+import { NgZone, OnInit, OnDestroy, Injector, ViewChild, HostBinding, Input, ElementRef, InjectFlags } from '@angular/core'
 import { trigger, transition, style, animate, AnimationTriggerMetadata } from '@angular/animations'
-import { AppService, ConfigService, BaseTabComponent, ElectronService, HostAppService, HotkeysService, Platform, LogService, Logger } from 'terminus-core'
+import { AppService, ConfigService, BaseTabComponent, ElectronService, HostAppService, HotkeysService, Platform, LogService, Logger, TabContextMenuItemProvider } from 'terminus-core'
 
 import { BaseSession, SessionsService } from '../services/sessions.service'
 import { TerminalFrontendService } from '../services/terminalFrontend.service'
@@ -11,7 +12,6 @@ import { TerminalFrontendService } from '../services/terminalFrontend.service'
 import { Frontend } from '../frontends/frontend'
 import { ResizeEvent } from './interfaces'
 import { TerminalDecorator } from './decorator'
-import { TerminalContextMenuItemProvider } from './contextMenuProvider'
 
 
 /** @hidden */
@@ -35,6 +35,8 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     ])]
 
     session: BaseSession
+    savedState: any
+
     @Input() zoom = 0
 
     @Input() showSearchPanel = false
@@ -61,6 +63,22 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
      */
     enablePassthrough = true
 
+    // Deps start
+    config: ConfigService
+    element: ElementRef
+    protected zone: NgZone
+    protected app: AppService
+    protected hostApp: HostAppService
+    protected hotkeys: HotkeysService
+    protected sessions: SessionsService
+    protected electron: ElectronService
+    protected terminalContainersService: TerminalFrontendService
+    protected toastr: ToastrServiceProxy
+    protected log: LogService
+    protected decorators: TerminalDecorator[]
+    protected contextMenuProviders: TabContextMenuItemProvider[]
+    // Deps end
+
     protected logger: Logger
     protected output = new Subject<string>()
     private sessionCloseSubscription: Subscription
@@ -74,24 +92,24 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     get alternateScreenActive$ (): Observable<boolean> { return this.frontend.alternateScreenActive$ }
     get frontendReady$ (): Observable<void> { return this.frontendReady }
 
-    constructor (
-        public config: ConfigService,
-        public element: ElementRef,
-        protected injector: Injector,
-        protected zone: NgZone,
-        protected app: AppService,
-        protected hostApp: HostAppService,
-        protected hotkeys: HotkeysService,
-        protected sessions: SessionsService,
-        protected electron: ElectronService,
-        protected terminalContainersService: TerminalFrontendService,
-        @Inject(ToastrService) protected toastr: ToastrServiceProxy,
-        protected log: LogService,
-        @Optional() @Inject(TerminalDecorator) protected decorators: TerminalDecorator[],
-        @Optional() @Inject(TerminalContextMenuItemProvider) protected contextMenuProviders: TerminalContextMenuItemProvider[],
-    ) {
+    constructor (protected injector: Injector) {
         super()
-        this.logger = log.create('baseTerminalTab')
+
+        this.config = injector.get(ConfigService)
+        this.element = injector.get(ElementRef)
+        this.zone = injector.get(NgZone)
+        this.app = injector.get(AppService)
+        this.hostApp = injector.get(HostAppService)
+        this.hotkeys = injector.get(HotkeysService)
+        this.sessions = injector.get(SessionsService)
+        this.electron = injector.get(ElectronService)
+        this.terminalContainersService = injector.get(TerminalFrontendService)
+        this.toastr = injector.get(ToastrService)
+        this.log = injector.get(LogService)
+        this.decorators = injector.get<any>(TerminalDecorator, null, InjectFlags.Optional) as TerminalDecorator[]
+        this.contextMenuProviders = injector.get<any>(TabContextMenuItemProvider, null, InjectFlags.Optional) as TabContextMenuItemProvider[]
+
+        this.logger = this.log.create('baseTerminalTab')
         this.decorators = this.decorators || []
         this.setTitle('Terminal')
 
@@ -156,7 +174,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     }
 
     /** @hidden */
-    ngOnInit () {
+    ngOnInit (): void {
         this.focused$.subscribe(() => {
             this.configure()
             this.frontend.focus()
@@ -172,12 +190,27 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             this.size = { columns, rows }
             this.frontendReady.next()
 
+            this.config.enabledServices(this.decorators).forEach(decorator => {
+                try {
+                    decorator.attach(this)
+                } catch (e) {
+                    this.logger.warn('Decorator attach() throws', e)
+                }
+            })
+
             setTimeout(() => {
                 this.session.resize(columns, rows)
             }, 1000)
 
             this.session.releaseInitialDataBuffer()
         })
+
+        if (this.savedState) {
+            this.frontend.restoreState(this.savedState)
+            this.frontend.write('\r\n\r\n')
+            this.frontend.write(colors.bgWhite.black(' * ') + colors.bgBlackBright.white(' History restored '))
+            this.frontend.write('\r\n\r\n')
+        }
 
         setImmediate(() => {
             if (this.hasFocus) {
@@ -194,14 +227,6 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         this.attachTermContainerHandlers()
 
         this.configure()
-
-        this.config.enabledServices(this.decorators).forEach((decorator) => {
-            try {
-                decorator.attach(this)
-            } catch (e) {
-                this.logger.warn('Decorator attach() throws', e)
-            }
-        })
 
         setTimeout(() => {
             this.output.subscribe(() => {
@@ -234,7 +259,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     /**
      * Feeds input into the active session
      */
-    sendInput (data: string|Buffer) {
+    sendInput (data: string|Buffer): void {
         if (!(data instanceof Buffer)) {
             data = Buffer.from(data, 'utf-8')
         }
@@ -247,7 +272,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     /**
      * Feeds input into the terminal frontend
      */
-    write (data: string) {
+    write (data: string): void {
         const percentageMatch = /(^|[^\d])(\d+(\.\d+)?)%([^\d]|$)/.exec(data)
         if (percentageMatch) {
             const percentage = percentageMatch[3] ? parseFloat(percentageMatch[2]) : parseInt(percentageMatch[2])
@@ -261,7 +286,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         this.frontend.write(data)
     }
 
-    paste () {
+    paste (): void {
         let data = this.electron.clipboard.readText() as string
         if (this.config.store.terminal.bracketedPaste) {
             data = '\x1b[200~' + data + '\x1b[201~'
@@ -293,23 +318,23 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         }
     }
 
-    zoomIn () {
+    zoomIn (): void {
         this.zoom++
         this.frontend.setZoom(this.zoom)
     }
 
-    zoomOut () {
+    zoomOut (): void {
         this.zoom--
         this.frontend.setZoom(this.zoom)
     }
 
-    resetZoom () {
+    resetZoom (): void {
         this.zoom = 0
         this.frontend.setZoom(this.zoom)
     }
 
     /** @hidden */
-    ngOnDestroy () {
+    ngOnDestroy (): void {
         this.frontend.detach(this.content.nativeElement)
         this.detachTermContainerHandlers()
         this.config.enabledServices(this.decorators).forEach(decorator => {
@@ -326,21 +351,21 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         this.output.complete()
     }
 
-    async destroy () {
+    async destroy (): Promise<void> {
         super.destroy()
         if (this.session && this.session.open) {
             await this.session.destroy()
         }
     }
 
-    protected detachTermContainerHandlers () {
+    protected detachTermContainerHandlers (): void {
         for (const subscription of this.termContainerSubscriptions) {
             subscription.unsubscribe()
         }
         this.termContainerSubscriptions = []
     }
 
-    protected attachTermContainerHandlers () {
+    protected attachTermContainerHandlers (): void {
         this.detachTermContainerHandlers()
 
         const maybeConfigure = () => {
@@ -365,7 +390,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                         event.stopPropagation()
                         return
                     }
-                    if (event.which === 3) {
+                    if (event.which === 3 || event.which === 1 && event.ctrlKey) {
                         if (this.config.store.terminal.rightClick === 'menu') {
                             this.hostApp.popupContextMenu(await this.buildContextMenu())
                         } else if (this.config.store.terminal.rightClick === 'paste') {
@@ -412,7 +437,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         ]
     }
 
-    protected attachSessionHandlers () {
+    protected attachSessionHandlers (): void {
         // this.session.output$.bufferTime(10).subscribe((datas) => {
         this.session.output$.subscribe(data => {
             if (this.enablePassthrough) {

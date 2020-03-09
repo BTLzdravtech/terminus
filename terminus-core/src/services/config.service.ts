@@ -20,7 +20,7 @@ function isNonStructuralObjectMember (v): boolean {
 
 /** @hidden */
 export class ConfigProxy {
-    constructor (real: any, defaults: any) {
+    constructor (real: Record<string, any>, defaults: Record<string, any>) {
         for (const key in defaults) {
             if (isStructuralMember(defaults[key])) {
                 if (!real[key]) {
@@ -71,8 +71,10 @@ export class ConfigProxy {
         }
     }
 
-    getValue (_key: string): any { } // eslint-disable-line @typescript-eslint/no-empty-function
-    setValue (_key: string, _value: any) { } // eslint-disable-line @typescript-eslint/no-empty-function
+    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-empty-function
+    getValue (_key: string): any { }
+    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-empty-function
+    setValue (_key: string, _value: any) { }
 }
 
 @Injectable({ providedIn: 'root' })
@@ -124,8 +126,23 @@ export class ConfigService {
         })
     }
 
-    getDefaults () {
-        return this.defaults
+    getDefaults (): Record<string, any> {
+        const cleanup = o => {
+            if (o instanceof Array) {
+                return o.map(cleanup)
+            } else if (o instanceof Object) {
+                const r = {}
+                for (const k of Object.keys(o)) {
+                    if (k !== '__nonStructural') {
+                        r[k] = cleanup(o[k])
+                    }
+                }
+                return r
+            } else {
+                return o
+            }
+        }
+        return cleanup(this.defaults)
     }
 
     load (): void {
@@ -173,11 +190,11 @@ export class ConfigService {
     enabledServices<T extends object> (services: T[]): T[] {
         if (!this.servicesCache) {
             this.servicesCache = {}
-            const ngModule = window['rootModule'].ngInjectorDef
+            const ngModule = window['rootModule'].ɵinj
             for (const imp of ngModule.imports) {
                 const module = imp['ngModule'] || imp
-                if (module.ngInjectorDef && module.ngInjectorDef.providers) {
-                    this.servicesCache[module['pluginName']] = module.ngInjectorDef.providers.map(provider => {
+                if (module.ɵinj?.providers) {
+                    this.servicesCache[module['pluginName']] = module.ɵinj.providers.map(provider => {
                         return provider['useClass'] || provider
                     })
                 }

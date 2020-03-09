@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { Component, Inject, Input, HostListener, HostBinding } from '@angular/core'
 import { trigger, style, animate, transition, state } from '@angular/animations'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
@@ -107,6 +108,12 @@ export class AppRootComponent {
                 if (hotkey === 'previous-tab') {
                     this.app.previousTab()
                 }
+                if (hotkey === 'move-tab-left') {
+                    this.app.moveSelectedTabLeft()
+                }
+                if (hotkey === 'move-tab-right') {
+                    this.app.moveSelectedTabRight()
+                }
             }
             if (hotkey === 'toggle-fullscreen') {
                 this.hostApp.toggleFullscreen()
@@ -184,6 +191,7 @@ export class AppRootComponent {
             if (this.config.store.appearance.dock === 'off') {
                 // not docked, visible
                 setTimeout(() => {
+                    this.hostApp.getWindow().show()
                     this.hostApp.getWindow().focus()
                 })
             } else {

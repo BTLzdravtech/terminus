@@ -2,9 +2,12 @@
 import { Observable, Subject, AsyncSubject } from 'rxjs'
 import { takeUntil } from 'rxjs/operators'
 import { Injectable } from '@angular/core'
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 
 import { BaseTabComponent } from '../components/baseTab.component'
 import { SplitTabComponent } from '../components/splitTab.component'
+import { SelectorModalComponent } from '../components/selectorModal.component'
+import { SelectorOption } from '../api/selector'
 
 import { ConfigService } from './config.service'
 import { HostAppService } from './hostApp.service'
@@ -69,6 +72,7 @@ export class AppService {
         private hostApp: HostAppService,
         private tabRecovery: TabRecoveryService,
         private tabsService: TabsService,
+        private ngbModal: NgbModal,
     ) {
         if (hostApp.getWindow().id === 1) {
             if (config.store.terminal.recoverTabs) {
@@ -89,7 +93,7 @@ export class AppService {
         })
     }
 
-    startTabStorage () {
+    startTabStorage (): void {
         this.tabsChanged$.subscribe(() => {
             this.tabRecovery.saveTabs(this.tabs)
         })
@@ -98,8 +102,13 @@ export class AppService {
         }, 30000)
     }
 
-    addTabRaw (tab: BaseTabComponent) {
-        this.tabs.push(tab)
+    addTabRaw (tab: BaseTabComponent, index: number|null = null): void {
+        if (index !== null) {
+            this.tabs.splice(index, 0, tab)
+        } else {
+            this.tabs.push(tab)
+        }
+
         this.selectTab(tab)
         this.tabsChanged.next()
         this.tabOpened.next(tab)
@@ -125,13 +134,18 @@ export class AppService {
             this.tabsChanged.next()
             this.tabClosed.next(tab)
         })
+
+        if (tab instanceof SplitTabComponent) {
+            tab.tabAdded$.subscribe(() => this.emitTabsChanged())
+            tab.tabRemoved$.subscribe(() => this.emitTabsChanged())
+        }
     }
 
     /**
      * Adds a new tab **without** wrapping it in a SplitTabComponent
      * @param inputs  Properties to be assigned on the new tab component instance
      */
-    openNewTabRaw (type: TabComponentType, inputs?: any): BaseTabComponent {
+    openNewTabRaw (type: TabComponentType, inputs?: Record<string, any>): BaseTabComponent {
         const tab = this.tabsService.create(type, inputs)
         this.addTabRaw(tab)
         return tab
@@ -141,7 +155,7 @@ export class AppService {
      * Adds a new tab while wrapping it in a SplitTabComponent
      * @param inputs  Properties to be assigned on the new tab component instance
      */
-    openNewTab (type: TabComponentType, inputs?: any): BaseTabComponent {
+    openNewTab (type: TabComponentType, inputs?: Record<string, any>): BaseTabComponent {
         const splitTab = this.tabsService.create(SplitTabComponent) as SplitTabComponent
         const tab = this.tabsService.create(type, inputs)
         splitTab.addTab(tab, null, 'r')
@@ -149,7 +163,7 @@ export class AppService {
         return tab
     }
 
-    selectTab (tab: BaseTabComponent) {
+    selectTab (tab: BaseTabComponent): void {
         if (this._activeTab === tab) {
             this._activeTab.emitFocused()
             return
@@ -185,14 +199,14 @@ export class AppService {
     }
 
     /** Switches between the current tab and the previously active one */
-    toggleLastTab () {
+    toggleLastTab (): void {
         if (!this.lastTabIndex || this.lastTabIndex >= this.tabs.length) {
             this.lastTabIndex = 0
         }
         this.selectTab(this.tabs[this.lastTabIndex])
     }
 
-    nextTab () {
+    nextTab (): void {
         if (this.tabs.length > 1) {
             const tabIndex = this.tabs.indexOf(this._activeTab)
             if (tabIndex < this.tabs.length - 1) {
@@ -203,7 +217,7 @@ export class AppService {
         }
     }
 
-    previousTab () {
+    previousTab (): void {
         if (this.tabs.length > 1) {
             const tabIndex = this.tabs.indexOf(this._activeTab)
             if (tabIndex > 0) {
@@ -214,8 +228,37 @@ export class AppService {
         }
     }
 
+    moveSelectedTabLeft (): void {
+        if (this.tabs.length > 1) {
+            const tabIndex = this.tabs.indexOf(this._activeTab)
+            if (tabIndex > 0) {
+                this.swapTabs(this._activeTab, this.tabs[tabIndex - 1])
+            } else if (this.config.store.appearance.cycleTabs) {
+                this.swapTabs(this._activeTab, this.tabs[this.tabs.length - 1])
+            }
+        }
+    }
+
+    moveSelectedTabRight (): void {
+        if (this.tabs.length > 1) {
+            const tabIndex = this.tabs.indexOf(this._activeTab)
+            if (tabIndex < this.tabs.length - 1) {
+                this.swapTabs(this._activeTab, this.tabs[tabIndex + 1])
+            } else if (this.config.store.appearance.cycleTabs) {
+                this.swapTabs(this._activeTab, this.tabs[0])
+            }
+        }
+    }
+
+    swapTabs (a: BaseTabComponent, b: BaseTabComponent): void {
+        const i1 = this.tabs.indexOf(a)
+        const i2 = this.tabs.indexOf(b)
+        this.tabs[i1] = b
+        this.tabs[i2] = a
+    }
+
     /** @hidden */
-    emitTabsChanged () {
+    emitTabsChanged (): void {
         this.tabsChanged.next()
     }
 
@@ -229,11 +272,12 @@ export class AppService {
         tab.destroy()
     }
 
-    async duplicateTab (tab: BaseTabComponent) {
+    async duplicateTab (tab: BaseTabComponent): Promise<BaseTabComponent|null> {
         const dup = await this.tabsService.duplicate(tab)
         if (dup) {
-            this.addTabRaw(dup)
+            this.addTabRaw(dup, this.tabs.indexOf(tab) + 1)
         }
+        return dup
     }
 
     /**
@@ -252,7 +296,7 @@ export class AppService {
     }
 
     /** @hidden */
-    emitReady () {
+    emitReady (): void {
         this.ready.next()
         this.ready.complete()
         this.hostApp.emitReady()
@@ -273,7 +317,15 @@ export class AppService {
         return this.completionObservers.get(tab)!.done$
     }
 
-    stopObservingTabCompletion (tab: BaseTabComponent) {
+    stopObservingTabCompletion (tab: BaseTabComponent): void {
         this.completionObservers.delete(tab)
+    }
+
+    showSelector <T> (name: string, options: SelectorOption<T>[]): Promise<T> {
+        const modal = this.ngbModal.open(SelectorModalComponent)
+        const instance: SelectorModalComponent<T> = modal.componentInstance
+        instance.name = name
+        instance.options = options
+        return modal.result as Promise<T>
     }
 }

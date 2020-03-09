@@ -8,7 +8,7 @@ import { Shell } from '../api/interfaces'
 /* eslint-disable block-scoped-var */
 
 try {
-    var wnr = require('windows-native-registry') // eslint-disable-line @typescript-eslint/no-var-requires
+    var wnr = require('windows-native-registry') // eslint-disable-line @typescript-eslint/no-var-requires, no-var
 } catch { }
 
 /** @hidden */
@@ -35,6 +35,7 @@ export class Cygwin32ShellProvider extends ShellProvider {
             id: 'cygwin32',
             name: 'Cygwin (32 bit)',
             command: path.join(cygwinPath, 'bin', 'bash.exe'),
+            args: ['--login', '-i'],
             icon: require('../icons/cygwin.svg'),
             env: {
                 TERM: 'cygwin',

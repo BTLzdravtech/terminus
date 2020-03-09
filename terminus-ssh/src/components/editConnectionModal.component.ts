@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { Component } from '@angular/core'
 import { NgbModal, NgbActiveModal } from '@ng-bootstrap/ng-bootstrap'
 import { ElectronService, HostAppService } from 'terminus-core'
@@ -82,10 +83,11 @@ export class EditConnectionModalComponent {
         this.electron.dialog.showOpenDialog(
             this.hostApp.getWindow(),
             {
+                defaultPath: this.connection.privateKey,
                 title: 'Select private key',
             }
         ).then(result => {
-            if (result.filePaths) {
+            if (!result.canceled) {
                 this.connection.privateKey = result.filePaths[0]
             }
         })

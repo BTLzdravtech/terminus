@@ -1,11 +1,10 @@
-import { Component, Input } from '@angular/core'
+import { Component, Input, Injector } from '@angular/core'
 import { Subscription } from 'rxjs'
 import { first } from 'rxjs/operators'
-import { BaseTabProcess } from 'terminus-core'
+import { BaseTabProcess, WIN_BUILD_CONPTY_SUPPORTED, isWindowsBuild } from 'terminus-core'
 import { BaseTerminalTabComponent } from '../api/baseTerminalTab.component'
 import { SessionOptions } from '../api/interfaces'
 import { Session } from '../services/sessions.service'
-import { WIN_BUILD_CONPTY_SUPPORTED, isWindowsBuild } from '../utils'
 
 /** @hidden */
 @Component({
@@ -18,7 +17,14 @@ export class TerminalTabComponent extends BaseTerminalTabComponent {
     @Input() sessionOptions: SessionOptions
     private homeEndSubscription: Subscription
 
-    ngOnInit () {
+    // eslint-disable-next-line @typescript-eslint/no-useless-constructor
+    constructor (
+        injector: Injector,
+    ) {
+        super(injector)
+    }
+
+    ngOnInit (): void {
         this.logger = this.log.create('terminalTab')
         this.session = new Session(this.config)
 
@@ -45,7 +51,7 @@ export class TerminalTabComponent extends BaseTerminalTabComponent {
         super.ngOnInit()
     }
 
-    initializeSession (columns: number, rows: number) {
+    initializeSession (columns: number, rows: number): void {
         this.sessions.addSession(
             this.session,
             Object.assign({}, this.sessionOptions, {
@@ -65,6 +71,7 @@ export class TerminalTabComponent extends BaseTerminalTabComponent {
                 ...this.sessionOptions,
                 cwd: cwd || this.sessionOptions.cwd,
             },
+            savedState: this.frontend?.saveState(),
         }
     }
 
@@ -94,7 +101,7 @@ export class TerminalTabComponent extends BaseTerminalTabComponent {
         )).response === 1
     }
 
-    ngOnDestroy () {
+    ngOnDestroy (): void {
         this.homeEndSubscription.unsubscribe()
         super.ngOnDestroy()
         this.session.destroy()

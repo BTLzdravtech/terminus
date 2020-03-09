@@ -1,5 +1,5 @@
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import * as yaml from 'js-yaml'
-import * as os from 'os'
 import { Subscription } from 'rxjs'
 import { Component, Inject, Input, HostBinding, NgZone } from '@angular/core'
 import {
@@ -14,6 +14,8 @@ import {
     Platform,
     HomeBaseService,
     ShellIntegrationService,
+    isWindowsBuild,
+    WIN_BUILD_FLUENT_BG_SUPPORTED,
 } from 'terminus-core'
 
 import { SettingsTabProvider } from '../api'
@@ -81,9 +83,7 @@ export class SettingsTabComponent extends BaseTabComponent {
             this.hotkeyDescriptions = descriptions
         })
 
-        this.isFluentVibrancySupported = hostApp.platform === Platform.Windows
-            && parseFloat(os.release()) >= 10
-            && parseInt(os.release().split('.')[2]) >= 17063
+        this.isFluentVibrancySupported = isWindowsBuild(WIN_BUILD_FLUENT_BG_SUPPORTED)
     }
 
     async ngOnInit () {
@@ -97,10 +97,6 @@ export class SettingsTabComponent extends BaseTabComponent {
             await this.shellIntegration.remove()
         }
         this.isShellIntegrationInstalled = await this.shellIntegration.isInstalled()
-    }
-
-    async getRecoveryToken (): Promise<any> {
-        return null
     }
 
     ngOnDestroy () {

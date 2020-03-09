@@ -4,6 +4,7 @@ import { Observable, Subject } from 'rxjs'
 import { Injectable, NgZone, EventEmitter } from '@angular/core'
 import { ElectronService } from './electron.service'
 import { Logger, LogService } from './log.service'
+import { isWindowsBuild, WIN_BUILD_FLUENT_BG_MOVE_BUG_FIXED, WIN_BUILD_FLUENT_BG_SUPPORTED } from '../utils'
 
 export enum Platform {
     Linux, macOS, Windows,
@@ -164,53 +165,61 @@ export class HostAppService {
         electron.ipcRenderer.on('host:config-change', () => this.zone.run(() => {
             this.configChangeBroadcast.next()
         }))
+
+
+        if (
+            isWindowsBuild(WIN_BUILD_FLUENT_BG_SUPPORTED) &&
+            !isWindowsBuild(WIN_BUILD_FLUENT_BG_MOVE_BUG_FIXED)
+        ) {
+            electron.ipcRenderer.send('window-set-disable-vibrancy-while-dragging', true)
+        }
     }
 
     /**
      * Returns the current remote [[BrowserWindow]]
      */
-    getWindow () {
+    getWindow (): Electron.BrowserWindow {
         return this.electron.BrowserWindow.fromId(this.windowId)
     }
 
-    newWindow () {
+    newWindow (): void {
         this.electron.ipcRenderer.send('app:new-window')
     }
 
-    toggleFullscreen () {
+    toggleFullscreen (): void {
         const window = this.getWindow()
         window.setFullScreen(!this.isFullScreen)
     }
 
-    openDevTools () {
+    openDevTools (): void {
         this.getWindow().webContents.openDevTools({ mode: 'undocked' })
     }
 
-    focusWindow () {
+    focusWindow (): void {
         this.electron.ipcRenderer.send('window-focus')
     }
 
-    minimize () {
+    minimize (): void {
         this.electron.ipcRenderer.send('window-minimize')
     }
 
-    maximize () {
+    maximize (): void {
         this.electron.ipcRenderer.send('window-maximize')
     }
 
-    unmaximize () {
+    unmaximize (): void {
         this.electron.ipcRenderer.send('window-unmaximize')
     }
 
-    toggleMaximize () {
+    toggleMaximize (): void {
         this.electron.ipcRenderer.send('window-toggle-maximize')
     }
 
-    setBounds (bounds: Bounds) {
+    setBounds (bounds: Bounds): void {
         this.electron.ipcRenderer.send('window-set-bounds', bounds)
     }
 
-    setAlwaysOnTop (flag: boolean) {
+    setAlwaysOnTop (flag: boolean): void {
         this.electron.ipcRenderer.send('window-set-always-on-top', flag)
     }
 
@@ -219,48 +228,46 @@ export class HostAppService {
      *
      * @param type `null`, or `fluent` when supported (Windowd only)
      */
-    setVibrancy (enable: boolean, type: string) {
+    setVibrancy (enable: boolean, type: string|null): void {
+        if (!isWindowsBuild(WIN_BUILD_FLUENT_BG_SUPPORTED)) {
+            type = null
+        }
         document.body.classList.toggle('vibrant', enable)
-        if (this.platform === Platform.macOS) {
-            this.getWindow().setVibrancy(enable ? 'dark' : null as any) // electron issue 20269
-        }
-        if (this.platform === Platform.Windows) {
-            this.electron.ipcRenderer.send('window-set-vibrancy', enable, type)
-        }
+        this.electron.ipcRenderer.send('window-set-vibrancy', enable, type)
     }
 
-    setTitle (title: string) {
+    setTitle (title: string): void {
         this.electron.ipcRenderer.send('window-set-title', title)
     }
 
-    setTouchBar (touchBar: Electron.TouchBar) {
+    setTouchBar (touchBar: Electron.TouchBar): void {
         this.getWindow().setTouchBar(touchBar)
     }
 
-    popupContextMenu (menuDefinition: Electron.MenuItemConstructorOptions[]) {
+    popupContextMenu (menuDefinition: Electron.MenuItemConstructorOptions[]): void {
         this.electron.Menu.buildFromTemplate(menuDefinition).popup({})
     }
 
     /**
      * Notifies other windows of config file changes
      */
-    broadcastConfigChange () {
+    broadcastConfigChange (): void {
         this.electron.ipcRenderer.send('app:config-change')
     }
 
-    emitReady () {
+    emitReady (): void {
         this.electron.ipcRenderer.send('app:ready')
     }
 
-    bringToFront () {
+    bringToFront (): void {
         this.electron.ipcRenderer.send('window-bring-to-front')
     }
 
-    closeWindow () {
+    closeWindow (): void {
         this.electron.ipcRenderer.send('window-close')
     }
 
-    relaunch () {
+    relaunch (): void {
         if (this.isPortable) {
             this.electron.app.relaunch({ execPath: process.env.PORTABLE_EXECUTABLE_FILE })
         } else {
@@ -269,7 +276,7 @@ export class HostAppService {
         this.electron.app.exit()
     }
 
-    quit () {
+    quit (): void {
         this.logger.info('Quitting')
         this.electron.app.quit()
     }

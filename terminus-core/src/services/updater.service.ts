@@ -8,6 +8,7 @@ import { Injectable } from '@angular/core'
 import { Logger, LogService } from './log.service'
 import { ElectronService } from './electron.service'
 import { ConfigService } from './config.service'
+import { AppUpdater } from 'electron-updater'
 
 const UPDATES_URL = 'https://api.github.com/repos/eugeny/terminus/releases/latest'
 
@@ -18,12 +19,12 @@ export class UpdaterService {
     private downloaded: Promise<boolean>
     private electronUpdaterAvailable = true
     private updateURL: string
-    private autoUpdater
+    private autoUpdater: AppUpdater
 
     constructor (
         log: LogService,
         private electron: ElectronService,
-        config: ConfigService,
+        private config: ConfigService,
     ) {
         this.logger = log.create('updater')
 
@@ -38,6 +39,7 @@ export class UpdaterService {
 
         this.autoUpdater.on('update-available', () => {
             this.logger.info('Update available')
+            this.autoUpdater.downloadUpdate()
         })
         this.autoUpdater.once('update-not-available', () => {
             this.logger.info('No updates')
@@ -47,9 +49,8 @@ export class UpdaterService {
             this.autoUpdater.once('update-downloaded', () => resolve(true))
         })
 
-        this.logger.debug('Checking for updates')
-
-        if (this.electronUpdaterAvailable && !process.env.TERMINUS_DEV) {
+        if (config.store.enableAutomaticUpdates && this.electronUpdaterAvailable && !process.env.TERMINUS_DEV) {
+            this.logger.debug('Checking for updates')
             try {
                 this.autoUpdater.checkForUpdates()
             } catch (e) {
@@ -60,6 +61,9 @@ export class UpdaterService {
     }
 
     async check (): Promise<boolean> {
+        if (!this.config.store.enableAutomaticUpdates) {
+            return false
+        }
         if (!this.electronUpdaterAvailable) {
             this.logger.debug('Checking for updates through fallback method.')
             const response = await axios.get(UPDATES_URL)
@@ -76,7 +80,7 @@ export class UpdaterService {
         return this.downloaded
     }
 
-    async update () {
+    async update (): Promise<void> {
         if (!this.electronUpdaterAvailable) {
             this.electron.shell.openExternal(this.updateURL)
         } else {

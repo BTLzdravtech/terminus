@@ -1,4 +1,5 @@
 import { app, ipcMain, Menu, Tray, shell } from 'electron'
+// eslint-disable-next-line no-duplicate-imports
 import * as electron from 'electron'
 import { loadConfig } from './config'
 import { Window, WindowOptions } from './window'
@@ -23,13 +24,14 @@ export class Application {
 
         app.commandLine.appendSwitch('disable-http-cache')
         app.commandLine.appendSwitch('lang', 'EN')
+        app.allowRendererProcessReuse = false
 
         for (const flag of configData.flags || [['force_discrete_gpu', '0']]) {
             app.commandLine.appendSwitch(flag[0], flag[1])
         }
     }
 
-    init () {
+    init (): void {
         electron.screen.on('display-metrics-changed', () => this.broadcast('host:display-metrics-changed'))
     }
 
@@ -50,20 +52,20 @@ export class Application {
         return window
     }
 
-    broadcast (event, ...args) {
-        for (let window of this.windows) {
+    broadcast (event: string, ...args): void {
+        for (const window of this.windows) {
             window.send(event, ...args)
         }
     }
 
-    async send (event, ...args) {
+    async send (event: string, ...args): Promise<void> {
         if (!this.hasWindows()) {
             await this.newWindow()
         }
         this.windows.filter(w => !w.isDestroyed())[0].send(event, ...args)
     }
 
-    enableTray () {
+    enableTray (): void {
         if (this.tray) {
             return
         }
@@ -74,7 +76,7 @@ export class Application {
             this.tray = new Tray(`${app.getAppPath()}/assets/tray.png`)
         }
 
-        this.tray.on('click', () => setTimeout(() => this.focus()));
+        this.tray.on('click', () => setTimeout(() => this.focus()))
 
         const contextMenu = Menu.buildFromTemplate([{
             label: 'Show',
@@ -88,18 +90,18 @@ export class Application {
         this.tray.setToolTip(`Terminus ${app.getVersion()}`)
     }
 
-    disableTray () {
+    disableTray (): void {
         if (this.tray) {
             this.tray.destroy()
             this.tray = null
         }
     }
 
-    hasWindows () {
+    hasWindows (): boolean {
         return !!this.windows.length
     }
 
-    focus () {
+    focus (): void {
         for (let window of this.windows) {
             window.show()
         }
@@ -185,7 +187,7 @@ export class Application {
                         },
                     },
                 ],
-            }
+            },
         ]
 
         Menu.setApplicationMenu(Menu.buildFromTemplate(template))

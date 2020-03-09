@@ -8,6 +8,10 @@ const NAME_PREFIX = 'terminus-'
 const KEYWORD = 'terminus-plugin'
 const OFFICIAL_NPM_ACCOUNT = 'eugenepankov'
 
+const BLACKLIST = [
+    'terminus-shell-selector', // superseded by profiles
+]
+
 export interface PluginInfo {
     name: string
     description: string
@@ -36,7 +40,7 @@ export class PluginManagerService {
         this.logger = log.create('pluginManager')
     }
 
-    async getNPM () {
+    async getNPM (): Promise<any> {
         if (!this.npm) {
             if (!this.npmReady) {
                 this.npmReady = new Promise(resolve => {
@@ -75,10 +79,11 @@ export class PluginManagerService {
                 isOfficial: item.package.publisher.username === OFFICIAL_NPM_ACCOUNT,
             }))),
             map(plugins => plugins.filter(x => x.packageName.startsWith(NAME_PREFIX))),
+            map(plugins => plugins.filter(x => !BLACKLIST.includes(x.packageName))),
         )
     }
 
-    async installPlugin (plugin: PluginInfo) {
+    async installPlugin (plugin: PluginInfo): Promise<void> {
         (await this.getNPM()).commands.install([`${plugin.packageName}@${plugin.version}`], err => {
             if (err) {
                 this.logger.error(err)
@@ -88,7 +93,7 @@ export class PluginManagerService {
         })
     }
 
-    async uninstallPlugin (plugin: PluginInfo) {
+    async uninstallPlugin (plugin: PluginInfo): Promise<void> {
         (await this.getNPM()).commands.remove([plugin.packageName], err => {
             if (err) {
                 this.logger.error(err)

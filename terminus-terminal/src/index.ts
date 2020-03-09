@@ -1,5 +1,5 @@
 import * as fs from 'mz/fs'
-import slug from 'slug'
+import slugify from 'slugify'
 
 import { NgModule } from '@angular/core'
 import { BrowserModule } from '@angular/platform-browser'
@@ -31,13 +31,13 @@ import { TerminalContextMenuItemProvider } from './api/contextMenuProvider'
 import { TerminalColorSchemeProvider } from './api/colorSchemeProvider'
 import { ShellProvider } from './api/shellProvider'
 import { TerminalSettingsTabProvider, AppearanceSettingsTabProvider, ShellSettingsTabProvider } from './settings'
-import { PathDropDecorator } from './pathDrop'
+import { DebugDecorator } from './features/debug'
+import { PathDropDecorator } from './features/pathDrop'
+import { ZModemDecorator } from './features/zmodem'
 import { TerminalConfigProvider } from './config'
 import { TerminalHotkeyProvider } from './hotkeys'
 import { HyperColorSchemes } from './colorSchemes'
-import { NewTabContextMenu, CopyPasteContextMenu } from './contextMenu'
-import { SaveAsProfileContextMenu } from './tabContextMenu'
-import { ZModemDecorator } from './zmodem'
+import { NewTabContextMenu, CopyPasteContextMenu, SaveAsProfileContextMenu, LegacyContextMenu } from './tabContextMenu'
 
 import { CmderShellProvider } from './shells/cmder'
 import { CustomShellProvider } from './shells/custom'
@@ -78,6 +78,7 @@ import { XTermFrontend, XTermWebGLFrontend } from './frontends/xtermFrontend'
         { provide: TerminalColorSchemeProvider, useClass: HyperColorSchemes, multi: true },
         { provide: TerminalDecorator, useClass: PathDropDecorator, multi: true },
         { provide: TerminalDecorator, useClass: ZModemDecorator, multi: true },
+        { provide: TerminalDecorator, useClass: DebugDecorator, multi: true },
 
         { provide: ShellProvider, useClass: WindowsDefaultShellProvider, multi: true },
         { provide: ShellProvider, useClass: MacOSDefaultShellProvider, multi: true },
@@ -92,10 +93,10 @@ import { XTermFrontend, XTermWebGLFrontend } from './frontends/xtermFrontend'
         { provide: ShellProvider, useClass: POSIXShellsProvider, multi: true },
         { provide: ShellProvider, useClass: WSLShellProvider, multi: true },
 
-        { provide: TerminalContextMenuItemProvider, useClass: NewTabContextMenu, multi: true },
-        { provide: TerminalContextMenuItemProvider, useClass: CopyPasteContextMenu, multi: true },
-
+        { provide: TabContextMenuItemProvider, useClass: NewTabContextMenu, multi: true },
+        { provide: TabContextMenuItemProvider, useClass: CopyPasteContextMenu, multi: true },
         { provide: TabContextMenuItemProvider, useClass: SaveAsProfileContextMenu, multi: true },
+        { provide: TabContextMenuItemProvider, useClass: LegacyContextMenu, multi: true },
 
         // For WindowsDefaultShellProvider
         PowerShellCoreShellProvider,
@@ -181,7 +182,7 @@ export default class TerminalModule { // eslint-disable-line @typescript-eslint/
             }
             if (hotkey.startsWith('profile.')) {
                 const profiles = await terminal.getProfiles()
-                const profile = profiles.find(x => slug(x.name).toLowerCase() === hotkey.split('.')[1])
+                const profile = profiles.find(x => slugify(x.name).toLowerCase() === hotkey.split('.')[1])
                 if (profile) {
                     terminal.openTabWithOptions(profile.sessionOptions)
                 }

@@ -1,4 +1,5 @@
 import { Injectable, Inject, NgZone, EventEmitter } from '@angular/core'
+import { Observable, Subject } from 'rxjs'
 import { HotkeyDescription, HotkeyProvider } from '../api/hotkeyProvider'
 import { stringifyKeySequence } from './hotkeys.util'
 import { ConfigService } from '../services/config.service'
@@ -20,8 +21,17 @@ interface EventBufferEntry {
 @Injectable({ providedIn: 'root' })
 export class HotkeysService {
     key = new EventEmitter<KeyboardEvent>()
+
+    /** @hidden */
     matchedHotkey = new EventEmitter<string>()
+
+    /**
+     * Fired for each recognized hotkey
+     */
+    get hotkey$ (): Observable<string> { return this._hotkey }
+
     globalHotkey = new EventEmitter<void>()
+    private _hotkey = new Subject<string>()
     private currentKeystrokes: EventBufferEntry[] = []
     private disabledLevel = 0
     private hotkeyDescriptions: HotkeyDescription[] = []
@@ -49,6 +59,9 @@ export class HotkeysService {
         this.getHotkeyDescriptions().then(hotkeys => {
             this.hotkeyDescriptions = hotkeys
         })
+
+        // deprecated
+        this.hotkey$.subscribe(h => this.matchedHotkey.emit(h))
     }
 
     /**
@@ -57,7 +70,7 @@ export class HotkeysService {
      * @param name DOM event name
      * @param nativeEvent event object
      */
-    pushKeystroke (name: string, nativeEvent: KeyboardEvent) {
+    pushKeystroke (name: string, nativeEvent: KeyboardEvent): void {
         (nativeEvent as any).event = name
         this.currentKeystrokes.push({ event: nativeEvent, time: performance.now() })
     }
@@ -65,26 +78,26 @@ export class HotkeysService {
     /**
      * Check the buffer for new complete keystrokes
      */
-    processKeystrokes () {
+    processKeystrokes (): void {
         if (this.isEnabled()) {
             this.zone.run(() => {
                 const matched = this.getCurrentFullyMatchedHotkey()
                 if (matched) {
                     console.log('Matched hotkey', matched)
-                    this.matchedHotkey.emit(matched)
+                    this._hotkey.next(matched)
                     this.clearCurrentKeystrokes()
                 }
             })
         }
     }
 
-    emitKeyEvent (nativeEvent: KeyboardEvent) {
+    emitKeyEvent (nativeEvent: KeyboardEvent): void {
         this.zone.run(() => {
             this.key.emit(nativeEvent)
         })
     }
 
-    clearCurrentKeystrokes () {
+    clearCurrentKeystrokes (): void {
         this.currentKeystrokes = []
     }
 
@@ -142,15 +155,15 @@ export class HotkeysService {
         return this.hotkeyDescriptions.filter((x) => x.id === id)[0]
     }
 
-    enable () {
+    enable (): void {
         this.disabledLevel--
     }
 
-    disable () {
+    disable (): void {
         this.disabledLevel++
     }
 
-    isEnabled () {
+    isEnabled (): boolean {
         return this.disabledLevel === 0
     }
 
@@ -202,6 +215,9 @@ export class HotkeysService {
             } else {
                 if (typeof value === 'string') {
                     value = [value]
+                }
+                if (!(value instanceof Array)) {
+                    continue
                 }
                 if (value) {
                     value = value.map((item: string | string[]) => typeof item === 'string' ? [item] : item)

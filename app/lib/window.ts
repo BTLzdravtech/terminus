@@ -27,6 +27,8 @@ export class Window {
     private windowConfig: ElectronConfig
     private windowBounds: Rectangle
     private closing = false
+    private lastVibrancy: {enabled: boolean, type?: string} | null = null
+    private disableVibrancyWhileDragging = false
 
     get visible$ (): Observable<boolean> { return this.visible }
 
@@ -48,6 +50,7 @@ export class Window {
             webPreferences: {
                 nodeIntegration: true,
                 preload: path.join(__dirname, 'sentry.js'),
+                backgroundThrottling: false,
             },
             frame: false,
             show: false,
@@ -56,14 +59,14 @@ export class Window {
 
         if (this.windowBounds) {
             Object.assign(bwOptions, this.windowBounds)
-            const closestDisplay = screen.getDisplayNearestPoint( {x: this.windowBounds.x, y: this.windowBounds.y} )
+            const closestDisplay = screen.getDisplayNearestPoint( { x: this.windowBounds.x, y: this.windowBounds.y } )
 
-            const [left1, top1, right1, bottom1] = [this.windowBounds.x, this.windowBounds.y, this.windowBounds.x + this.windowBounds.width, this.windowBounds.y + this.windowBounds.height];
-            const [left2, top2, right2, bottom2] = [closestDisplay.bounds.x, closestDisplay.bounds.y, closestDisplay.bounds.x + closestDisplay.bounds.width, closestDisplay.bounds.y + closestDisplay.bounds.height];
+            const [left1, top1, right1, bottom1] = [this.windowBounds.x, this.windowBounds.y, this.windowBounds.x + this.windowBounds.width, this.windowBounds.y + this.windowBounds.height]
+            const [left2, top2, right2, bottom2] = [closestDisplay.bounds.x, closestDisplay.bounds.y, closestDisplay.bounds.x + closestDisplay.bounds.width, closestDisplay.bounds.y + closestDisplay.bounds.height]
 
             if ((left2 > right1 || right2 < left1 || top2 > bottom1 || bottom2 < top1) && !maximized) {
-                bwOptions.x = closestDisplay.bounds.width / 2 - bwOptions.width / 2;
-                bwOptions.y = closestDisplay.bounds.height / 2 - bwOptions.height / 2;
+                bwOptions.x = closestDisplay.bounds.width / 2 - bwOptions.width / 2
+                bwOptions.y = closestDisplay.bounds.height / 2 - bwOptions.height / 2
             }
         }
 
@@ -116,12 +119,13 @@ export class Window {
         })
     }
 
-    setVibrancy (enabled: boolean, type?: string) {
+    setVibrancy (enabled: boolean, type?: string): void {
+        this.lastVibrancy = { enabled, type }
         if (process.platform === 'win32') {
             if (parseFloat(os.release()) >= 10) {
                 let attribValue = AccentState.ACCENT_DISABLED
                 if (enabled) {
-                    if (parseInt(os.release().split('.')[2]) >= 17063 && type === 'fluent') {
+                    if (type === 'fluent') {
                         attribValue = AccentState.ACCENT_ENABLE_ACRYLICBLURBEHIND
                     } else {
                         attribValue = AccentState.ACCENT_ENABLE_BLURBEHIND
@@ -131,26 +135,28 @@ export class Window {
             } else {
                 DwmEnableBlurBehindWindow(this.window, enabled)
             }
+        } else {
+            this.window.setVibrancy(enabled ? 'dark' : null as any) // electron issue 20269
         }
     }
 
-    show () {
+    show (): void {
         this.window.show()
     }
 
-    focus () {
+    focus (): void {
         this.window.focus()
     }
 
-    send (event, ...args) {
+    send (event: string, ...args): void {
         if (!this.window) {
             return
         }
         this.window.webContents.send(event, ...args)
     }
 
-    isDestroyed () {
-        return !this.window || this.window.isDestroyed();
+    isDestroyed (): boolean {
+        return !this.window || this.window.isDestroyed()
     }
 
     private setupWindowManagement () {
@@ -293,6 +299,29 @@ export class Window {
         })
 
         this.window.webContents.on('new-window', event => event.preventDefault())
+
+        ipcMain.on('window-set-disable-vibrancy-while-dragging', (_event, value) => {
+            this.disableVibrancyWhileDragging = value
+        })
+
+        this.window.on('will-move', () => {
+            if (!this.lastVibrancy?.enabled || !this.disableVibrancyWhileDragging) {
+                return
+            }
+            let timeout: number|null = null
+            const oldVibrancy = this.lastVibrancy
+            this.setVibrancy(false)
+            const onMove = () => {
+                if (timeout) {
+                    clearTimeout(timeout)
+                }
+                timeout = setTimeout(() => {
+                    this.window.off('move', onMove)
+                    this.setVibrancy(oldVibrancy.enabled, oldVibrancy.type)
+                }, 500)
+            }
+            this.window.on('move', onMove)
+        })
     }
 
     private destroy () {
