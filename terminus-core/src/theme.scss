@@ -246,7 +246,7 @@ ngb-tabset .tab-content {
 }
 
 .list-group-item {
-    transition: 0.25s background;
+    transition: 0.0625s background;
 
     i + * {
         margin-left: 10px;
@@ -259,6 +259,29 @@ ngb-tabset .tab-content {
 
     &:not(:last-child) {
         border-bottom: none;
+    }
+}
+
+
+.list-group-light {
+    .list-group-item {
+        background: transparent;
+        border: none;
+        border-top: 1px solid rgba(255, 255, 255, .1);
+
+        &:not(.combi) {
+            padding: $list-group-item-padding-y $list-group-item-padding-x;
+        }
+
+        &:first-child {
+            border-top: none;
+        }
+
+        &.list-group-item-action {
+            &:hover, &.active {
+                background: $list-group-hover-bg;
+            }
+        }
     }
 }
 
@@ -391,4 +414,8 @@ search-panel {
         color: $nav-tabs-link-active-color;
         border-color: $nav-tabs-link-active-border-color;
     }
+}
+
+hr {
+    border-color: $list-group-border-color;
 }

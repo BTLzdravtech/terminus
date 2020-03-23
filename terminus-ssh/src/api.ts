@@ -34,6 +34,7 @@ export interface SSHConnection {
     color?: string
     x11?: boolean
     skipBanner?: boolean
+    disableDynamicTitle?: boolean
 
     algorithms?: {[t: string]: string[]}
 }
@@ -86,6 +87,13 @@ export class SSHSession extends BaseSession {
     constructor (public connection: SSHConnection) {
         super()
         this.scripts = connection.scripts || []
+        this.destroyed$.subscribe(() => {
+            for (const port of this.forwardedPorts) {
+                if (port.type === PortForwardType.Local) {
+                    port.stopLocalListener()
+                }
+            }
+        })
     }
 
     async start (): Promise<void> {
@@ -237,14 +245,16 @@ export class SSHSession extends BaseSession {
                             socket.destroy()
                             return
                         }
-                        stream.pipe(socket)
-                        socket.pipe(stream)
-                        stream.on('close', () => {
-                            socket.destroy()
-                        })
-                        socket.on('close', () => {
-                            stream.close()
-                        })
+                        if (stream) {
+                            stream.pipe(socket)
+                            socket.pipe(stream)
+                            stream.on('close', () => {
+                                socket.destroy()
+                            })
+                            socket.on('close', () => {
+                                stream.close()
+                            })
+                        }
                     }
                 )
             }).then(() => {
