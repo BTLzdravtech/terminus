@@ -114,6 +114,9 @@ export class AppRootComponent {
                 if (hotkey === 'move-tab-right') {
                     this.app.moveSelectedTabRight()
                 }
+                if (hotkey === 'reopen-tab') {
+                    this.app.reopenLastTab()
+                }
             }
             if (hotkey === 'toggle-fullscreen') {
                 this.hostApp.toggleFullscreen()
@@ -123,13 +126,6 @@ export class AppRootComponent {
         this.docking.dock()
         this.hostApp.shown.subscribe(() => {
             this.docking.dock()
-        })
-
-        this.hostApp.secondInstance$.subscribe(() => {
-            this.presentWindow()
-        })
-        this.hotkeys.globalHotkey.subscribe(() => {
-            this.onGlobalHotkey()
         })
 
         this.hostApp.windowCloseRequest$.subscribe(async () => {
@@ -170,41 +166,6 @@ export class AppRootComponent {
             this.unsortedTabs = this.unsortedTabs.filter(x => x !== tab)
             this.noTabs = app.tabs.length === 0
         })
-    }
-
-    onGlobalHotkey () {
-        if (this.hostApp.getWindow().isFocused()) {
-            this.hideWindow()
-        } else {
-            this.presentWindow()
-        }
-    }
-
-    presentWindow () {
-        if (!this.hostApp.getWindow().isVisible()) {
-            // unfocused, invisible
-            this.hostApp.getWindow().show()
-            this.hostApp.getWindow().focus()
-        } else {
-            if (this.config.store.appearance.dock === 'off') {
-                // not docked, visible
-                setTimeout(() => {
-                    this.hostApp.getWindow().show()
-                    this.hostApp.getWindow().focus()
-                })
-            } else {
-                // docked, visible
-                this.hostApp.getWindow().hide()
-            }
-        }
-    }
-
-    hideWindow () {
-        this.electron.loseFocus()
-        this.hostApp.getWindow().blur()
-        if (this.hostApp.platform !== Platform.macOS) {
-            this.hostApp.getWindow().hide()
-        }
     }
 
     async ngOnInit () {

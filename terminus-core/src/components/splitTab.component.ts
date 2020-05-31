@@ -324,7 +324,7 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
      * Inserts a new `tab` to the `side` of the `relative` tab
      */
     async addTab (tab: BaseTabComponent, relative: BaseTabComponent|null, side: SplitDirection): Promise<void> {
-        await this.initialized$.toPromise()
+        tab.parent = this
 
         let target = (relative ? this.getParentOf(relative) : null) || this.root
         let insertIndex = relative ? target.children.indexOf(relative) : -1
@@ -355,6 +355,9 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
         target.children.splice(insertIndex, 0, tab)
 
         this.recoveryStateChangedHint.next()
+
+        await this.initialized$.toPromise()
+
         this.attachTabView(tab)
 
         setImmediate(() => {
@@ -374,11 +377,11 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
         parent.children.splice(index, 1)
 
         this.detachTabView(tab)
+        tab.parent = null
 
         this.layout()
 
         this.tabRemoved.next(tab)
-
         if (this.root.children.length === 0) {
             this.destroy()
         } else {
@@ -526,21 +529,24 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
             if (child instanceof SplitContainer) {
                 this.layoutInternal(child, childX, childY, childW, childH)
             } else {
-                const element = this.viewRefs.get(child)!.rootNodes[0]
-                element.classList.toggle('child', true)
-                element.classList.toggle('maximized', child === this.maximizedTab)
-                element.classList.toggle('minimized', this.maximizedTab && child !== this.maximizedTab)
-                element.classList.toggle('focused', child === this.focusedTab)
-                element.style.left = `${childX}%`
-                element.style.top = `${childY}%`
-                element.style.width = `${childW}%`
-                element.style.height = `${childH}%`
+                const viewRef = this.viewRefs.get(child)
+                if (viewRef) {
+                    const element = viewRef.rootNodes[0]
+                    element.classList.toggle('child', true)
+                    element.classList.toggle('maximized', child === this.maximizedTab)
+                    element.classList.toggle('minimized', this.maximizedTab && child !== this.maximizedTab)
+                    element.classList.toggle('focused', child === this.focusedTab)
+                    element.style.left = `${childX}%`
+                    element.style.top = `${childY}%`
+                    element.style.width = `${childW}%`
+                    element.style.height = `${childH}%`
 
-                if (child === this.maximizedTab) {
-                    element.style.left = '5%'
-                    element.style.top = '5%'
-                    element.style.width = '90%'
-                    element.style.height = '90%'
+                    if (child === this.maximizedTab) {
+                        element.style.left = '5%'
+                        element.style.top = '5%'
+                        element.style.width = '90%'
+                        element.style.height = '90%'
+                    }
                 }
             }
             offset += sizes[i]
@@ -569,6 +575,7 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
                 if (recovered) {
                     const tab = this.tabsService.create(recovered.type, recovered.options)
                     children.push(tab)
+                    tab.parent = this
                     this.attachTabView(tab)
                 } else {
                     state.ratios.splice(state.children.indexOf(childState), 0)

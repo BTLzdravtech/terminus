@@ -11,7 +11,7 @@ h3.mb-3 Shell
     )
         option(
             *ngFor='let profile of profiles',
-            [ngValue]='slugify(profile.name).toLowerCase()'
+            [ngValue]='terminal.getProfileID(profile)'
         ) {{profile.name}}
 
 
@@ -73,6 +73,16 @@ h3.mb-3 Shell
         .description Inject additional environment variables
 
     environment-editor([(model)]='this.config.store.terminal.environment')
+
+.form-line(*ngIf='config.store.terminal.profiles.length > 0')
+    .header
+        .title Show default profiles in the selector
+        .description If disabled, only custom profiles will show up in the profile selector
+
+    toggle(
+        [(ngModel)]='config.store.terminal.showDefaultProfiles',
+        (ngModelChange)='config.save()'
+    )
 
 h3.mt-3 Saved Profiles
 

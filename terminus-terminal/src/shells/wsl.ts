@@ -88,13 +88,16 @@ export class WSLShellProvider extends ShellProvider {
             if (!childKey.DistributionName) {
                 continue
             }
+            const wslVersion = childKey.Flags.value & 8 ? 2 : 1
             const name = childKey.DistributionName.value
+            const fsBase = wslVersion === 2 ? `\\\\wsl$\\${name}` : childKey.BasePath.value as string + '\\rootfs'
+            const slug = slugify(name, { remove: /[:.]/g })
             const shell: Shell = {
-                id: `wsl-${slugify(name)}`,
+                id: `wsl-${slug}`,
                 name: `WSL / ${name}`,
                 command: wslPath,
                 args: ['-d', name],
-                fsBase: childKey.BasePath.value as string + '\\rootfs',
+                fsBase,
                 env: {
                     TERM: 'xterm-color',
                     COLORTERM: 'truecolor',

@@ -37,6 +37,7 @@ export class TerminalConfigProvider extends ConfigProvider {
                 name: 'Material',
                 foreground: '#eceff1',
                 background: 'rgba(38, 50, 56, 1)',
+                selection: null,
                 cursor: '#FFCC00',
                 colors: [
                     '#000000',
@@ -62,6 +63,8 @@ export class TerminalConfigProvider extends ConfigProvider {
             profiles: [],
             useConPTY: true,
             recoverTabs: true,
+            warnOnMultilinePaste: true,
+            showDefaultProfiles: true,
         },
     }
 
@@ -96,7 +99,6 @@ export class TerminalConfigProvider extends ConfigProvider {
                 ],
                 'new-tab': [
                     '⌘-T',
-                    '⌘-N',
                 ],
                 home: ['⌘-Left', 'Home'],
                 end: ['⌘-Right', 'End'],
