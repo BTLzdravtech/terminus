@@ -187,7 +187,7 @@ export class SSHService {
             if (this.hostApp.platform === Platform.Windows) {
                 const pageantRunning = new Promise<boolean>(resolve => {
                     windowsProcessTreeNative.getProcessList(list => { // eslint-disable-line block-scoped-var
-                        resolve(list.some(x => x.name === 'pageant.exe'))
+                        resolve(list.some(x => x.name === 'pageant.exe' || x.name === 'KeePass.exe'))
                     }, 0)
                 })
                 if (await pageantRunning) {
