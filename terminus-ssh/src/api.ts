@@ -24,6 +24,7 @@ export interface SSHConnection {
     host: string
     port: number
     user: string
+    auth?: null|'password'|'publicKey'|'agent'|'keyboardInteractive'
     password?: string
     privateKey?: string
     group: string | null
@@ -105,6 +106,7 @@ export class SSHSession extends BaseSession {
             this.shell = await this.openShellChannel({ x11: this.connection.x11 })
         } catch (err) {
             this.emitServiceMessage(colors.bgRed.black(' X ') + ` Remote rejected opening a shell channel: ${err}`)
+            return
         }
 
         this.shell.on('greeting', greeting => {

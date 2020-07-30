@@ -95,6 +95,10 @@ export class SSHTabComponent extends BaseTerminalTabComponent {
             session.resize(this.size.columns, this.size.rows)
         })
 
+        session.destroyed$.subscribe(() => {
+            this.write('\r\n' + colors.black.bgCyan(' SSH ') + ` ${session.connection.host}: session closed\r\n`)
+        })
+
         this.write('\r\n' + colors.black.bgCyan(' SSH ') + ` Connecting to ${session.connection.host}\r\n`)
 
         const spinner = new Spinner({
@@ -149,21 +153,26 @@ export class SSHTabComponent extends BaseTerminalTabComponent {
         modal.session = this.session
     }
 
-    reconnect (): void {
-        this.initializeSession()
+    async reconnect (): Promise<void> {
+        this.session?.destroy()
+        await this.initializeSession()
+        this.session.releaseInitialDataBuffer()
     }
 
-    // async canClose (): Promise<boolean> {
-    //     return (await this.electron.showMessageBox(
-    //         this.hostApp.getWindow(),
-    //         {
-    //             type: 'warning',
-    //             message: `Disconnect from ${this.connection.host}?`,
-    //             buttons: ['Cancel', 'Disconnect'],
-    //             defaultId: 1,
-    //         }
-    //     )).response === 1
-    // }
+    async canClose (): Promise<boolean> {
+        if (!this.session?.open) {
+            return true
+        }
+        return (await this.electron.showMessageBox(
+            this.hostApp.getWindow(),
+            {
+                type: 'warning',
+                message: `Disconnect from ${this.connection.host}?`,
+                buttons: ['Cancel', 'Disconnect'],
+                defaultId: 1,
+            }
+        )).response === 1
+    }
 
     ngOnDestroy (): void {
         this.homeEndSubscription.unsubscribe()

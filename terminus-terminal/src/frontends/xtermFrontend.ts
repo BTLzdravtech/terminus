@@ -124,7 +124,7 @@ export class XTermFrontend extends Frontend {
         }
 
         this.xterm.buffer.onBufferChange(() => {
-            const altBufferActive = this.xterm.buffer.active === this.xterm.buffer.alternate
+            const altBufferActive = this.xterm.buffer.active.type === 'alternate'
             this.alternateScreenActive.next(altBufferActive)
         })
     }
@@ -155,7 +155,7 @@ export class XTermFrontend extends Frontend {
         host.addEventListener('mouseup', event => this.mouseEvent.next(event as MouseEvent))
         host.addEventListener('mousewheel', event => this.mouseEvent.next(event as MouseEvent))
 
-        const ro = new window['ResizeObserver'](() => this.resizeHandler())
+        const ro = new window['ResizeObserver'](() => setTimeout(() => this.resizeHandler()))
         ro.observe(host)
     }
 

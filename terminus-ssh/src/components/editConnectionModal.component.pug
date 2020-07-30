@@ -19,20 +19,21 @@
                         [(ngModel)]='connection.group',
                     )
 
-                .form-group
-                    label Host
-                    input.form-control(
-                        type='text',
-                        [(ngModel)]='connection.host',
-                    )
+                .d-flex
+                    .form-group
+                        label Host
+                        input.form-control(
+                            type='text',
+                            [(ngModel)]='connection.host',
+                        )
 
-                .form-group
-                    label Port
-                    input.form-control(
-                        type='number',
-                        placeholder='22',
-                        [(ngModel)]='connection.port',
-                    )
+                    .form-group
+                        label Port
+                        input.form-control(
+                            type='number',
+                            placeholder='22',
+                            [(ngModel)]='connection.port',
+                        )
 
                 .form-group
                     label Username
@@ -42,6 +43,34 @@
                     )
 
                 .form-line
+                    .header
+                        .title Authentication
+                .btn-group.w-100(
+                    [(ngModel)]='connection.auth',
+                    ngbRadioGroup
+                )
+                    label.btn.btn-outline-secondary(ngbButtonLabel)
+                        input(type='radio', ngbButton, [value]='null')
+                        i.far.fa-lightbulb
+                        .m-0 Auto
+                    label.btn.btn-outline-secondary(ngbButtonLabel)
+                        input(type='radio', ngbButton, [value]='"password"')
+                        i.fas.fa-font
+                        .m-0 Password
+                    label.btn.btn-outline-secondary(ngbButtonLabel)
+                        input(type='radio', ngbButton, [value]='"publicKey"')
+                        i.fas.fa-key
+                        .m-0 Key
+                    label.btn.btn-outline-secondary(ngbButtonLabel)
+                        input(type='radio', ngbButton, [value]='"agent"')
+                        i.fas.fa-user-secret
+                        .m-0 Agent
+                    label.btn.btn-outline-secondary(ngbButtonLabel)
+                        input(type='radio', ngbButton, [value]='"keyboardInteractive"')
+                        i.far.fa-keyboard
+                        .m-0 Interactive
+
+                .form-line(*ngIf='!connection.auth || connection.auth === "password"')
                     .header
                         .title Password
                         .description(*ngIf='!hasSavedPassword') Save a password in the keychain
@@ -53,7 +82,7 @@
                         i.fas.fa-trash-alt
                         span Forget
 
-                .form-line
+                .form-line(*ngIf='!connection.auth || connection.auth === "publicKey"')
                     .header
                         .title Private key
                         .description Path to the private key file
@@ -74,8 +103,8 @@
                     .header
                         .title Jump host
                     select.form-control([(ngModel)]='connection.jumpHost')
-                        option([value]='null') None
-                        option([value]='x.name', *ngFor='let x of config.store.ssh.connections') {{x.name}}
+                        option([ngValue]='null') None
+                        option([ngValue]='x.name', *ngFor='let x of config.store.ssh.connections') {{x.name}}
 
                 .form-line
                     .header

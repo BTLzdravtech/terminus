@@ -52,9 +52,9 @@ ngb-tabset.vertical(type='pills', [activeId]='activeTab')
                         )
                         | At the bottom
 
-            .form-line(*ngIf='hostApp.platform !== Platform.Linux')
+            .form-line
                 .header
-                    .title(*ngIf='hostApp.platform === Platform.Windows') Acrylic background
+                    .title(*ngIf='hostApp.platform !== Platform.macOS') Acrylic background
                     .title(*ngIf='hostApp.platform === Platform.macOS') Vibrancy
                     .description Gives the window a blurred transparent background
 
@@ -288,7 +288,7 @@ ngb-tabset.vertical(type='pills', [activeId]='activeTab')
                         th ID
                         th Hotkey
                     ng-container(*ngFor='let hotkey of hotkeyDescriptions')
-                        tr(*ngIf='!hotkeyFilter || hotkey.name.toLowerCase().includes(hotkeyFilter.toLowerCase())')
+                        tr(*ngIf='!hotkeyFilter || hotkeyFilterFn(hotkey, hotkeyFilter)')
                             td {{hotkey.name}}
                             td {{hotkey.id}}
                             td.pr-5

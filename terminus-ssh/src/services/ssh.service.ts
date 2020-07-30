@@ -16,9 +16,7 @@ import { PromptModalComponent } from '../components/promptModal.component'
 import { PasswordStorageService } from './passwordStorage.service'
 import { SSHTabComponent } from '../components/sshTab.component'
 
-try {
-    var windowsProcessTreeNative = require('windows-process-tree/build/Release/windows_process_tree.node') // eslint-disable-line @typescript-eslint/no-var-requires, no-var
-} catch { }
+const WINDOWS_OPENSSH_AGENT_PIPE = '\\\\.\\pipe\\openssh-ssh-agent'
 
 @Injectable({ providedIn: 'root' })
 export class SSHService {
@@ -114,7 +112,9 @@ export class SSHService {
                         'ssh-keygen.exe',
                     )
                     await execFile('icacls', [temp.path, '/inheritance:r'])
-                    await execFile('icacls', [temp.path, '/grant:r', `${process.env.USERNAME}:(R,W)`])
+                    let sid = await execFile('whoami', ['/user', '/nh'])
+                    sid = sid[0].split(' ')[0]
+                    await execFile('icacls', [temp.path, '/grant:r', `${sid}:(R,W)`])
                 }
 
                 await execFile(sshKeygenPath, [
@@ -165,8 +165,13 @@ export class SSHService {
                     const modal = this.ngbModal.open(PromptModalComponent)
                     modal.componentInstance.prompt = prompt.prompt
                     modal.componentInstance.password = !prompt.echo
-                    const result = await modal.result
-                    results.push(result ? result.value : '')
+
+                    try {
+                        const result = await modal.result
+                        results.push(result ? result.value : '')
+                    } catch {
+                        results.push('')
+                    }
                 }
                 finish(results)
             }))
@@ -185,17 +190,37 @@ export class SSHService {
 
             let agent: string|null = null
             if (this.hostApp.platform === Platform.Windows) {
-                const pageantRunning = new Promise<boolean>(resolve => {
-                    windowsProcessTreeNative.getProcessList(list => { // eslint-disable-line block-scoped-var
-                        resolve(list.some(x => x.name === 'pageant.exe' || x.name === 'KeePass.exe'))
-                    }, 0)
-                })
-                if (await pageantRunning) {
+                if (await fs.exists(WINDOWS_OPENSSH_AGENT_PIPE)) {
+                    agent = WINDOWS_OPENSSH_AGENT_PIPE
+                } else {
                     agent = 'pageant'
                 }
             } else {
                 agent = process.env.SSH_AUTH_SOCK as string
             }
+
+            const authMethodsLeft = ['none']
+            if (!session.connection.auth || session.connection.auth === 'password') {
+                authMethodsLeft.push('password')
+            }
+            if (!session.connection.auth || session.connection.auth === 'publicKey') {
+                if (!privateKey) {
+                    log('\r\nPrivate key auth selected, but no key is loaded\r\n')
+                } else {
+                    authMethodsLeft.push('publickey')
+                }
+            }
+            if (!session.connection.auth || session.connection.auth === 'agent') {
+                if (!agent) {
+                    log('\r\nAgent auth selected, but no running agent is detected\r\n')
+                } else {
+                    authMethodsLeft.push('agent')
+                }
+            }
+            if (!session.connection.auth || session.connection.auth === 'keyboardInteractive') {
+                authMethodsLeft.push('keyboard-interactive')
+            }
+            authMethodsLeft.push('hostbased')
 
             try {
                 ssh.connect({
@@ -206,11 +231,11 @@ export class SSHService {
                     privateKey: privateKey || undefined,
                     tryKeyboard: true,
                     agent: agent || undefined,
-                    agentForward: !!agent,
+                    agentForward: (!session.connection.auth || session.connection.auth === 'agent') && !!agent,
                     keepaliveInterval: session.connection.keepaliveInterval,
                     keepaliveCountMax: session.connection.keepaliveCountMax,
                     readyTimeout: session.connection.readyTimeout,
-                    hostVerifier: digest => {
+                    hostVerifier: (digest: string) => {
                         log(colors.bgWhite(' ') + ' Host key fingerprint:')
                         log(colors.bgWhite(' ') + ' ' + colors.black.bgWhite(' SHA256 ') + colors.bgBlackBright(' ' + digest + ' '))
                         return true
@@ -218,7 +243,21 @@ export class SSHService {
                     hostHash: 'sha256' as any,
                     algorithms: session.connection.algorithms,
                     sock: session.jumpStream,
-                })
+                    authHandler: methodsLeft => {
+                        while (true) {
+                            let method = authMethodsLeft.shift()
+                            if (!method) {
+                                return false
+                            }
+                            if (methodsLeft && !methodsLeft.includes(method) && method !== 'agent') {
+                                // Agent can still be used even if not in methodsLeft
+                                this.logger.info('Server does not support auth method', method)
+                                continue
+                            }
+                            return method
+                        }
+                    },
+                } as any)
             } catch (e) {
                 this.toastr.error(e.message)
                 reject(e)

@@ -308,25 +308,25 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             data = data.replace(/\n/g, '\r')
         }
 
-        if (!this.alternateScreenActive && data.includes('\r') && this.config.store.terminal.warnOnMultilinePaste) {
-            const canTrim = !data.trim().includes('\r')
-            const buttons = canTrim ? ['Paste', 'Trim whitespace and paste', 'Cancel'] : ['Paste', 'Cancel']
-            const result = (await this.electron.showMessageBox(
-                this.hostApp.getWindow(),
-                {
-                    type: 'warning',
-                    detail: data,
-                    message: `Paste multiple lines?`,
-                    buttons,
-                    defaultId: 0,
-                    cancelId: buttons.length - 1,
+        if (!this.alternateScreenActive) {
+            data = data.trim()
+
+            if (data.includes('\r') && this.config.store.terminal.warnOnMultilinePaste) {
+                const buttons = ['Paste', 'Cancel']
+                const result = (await this.electron.showMessageBox(
+                    this.hostApp.getWindow(),
+                    {
+                        type: 'warning',
+                        detail: data,
+                        message: `Paste multiple lines?`,
+                        buttons,
+                        defaultId: 0,
+                        cancelId: 1,
+                    }
+                )).response
+                if (result === 1) {
+                    return
                 }
-            )).response
-            if (result === buttons.length - 1) {
-                return
-            }
-            if (result === 1) {
-                data = data.trim()
             }
         }
         this.sendInput(data)
@@ -474,7 +474,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         ]
     }
 
-    protected attachSessionHandlers (): void {
+    protected attachSessionHandlers (destroyOnSessionClose = false): void {
         // this.session.output$.bufferTime(10).subscribe((datas) => {
         this.session.output$.subscribe(data => {
             if (this.enablePassthrough) {
@@ -485,9 +485,11 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             }
         })
 
-        this.sessionCloseSubscription = this.session.closed$.subscribe(() => {
-            this.frontend.destroy()
-            this.destroy()
-        })
+        if (destroyOnSessionClose) {
+            this.sessionCloseSubscription = this.session.closed$.subscribe(() => {
+                this.frontend.destroy()
+                this.destroy()
+            })
+        }
     }
 }

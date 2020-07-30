@@ -1,3 +1,8 @@
+import * as glasstron from 'glasstron'
+if (process.platform === 'win32' || process.platform === 'linux') {
+    glasstron.init()
+}
+
 import { Subject, Observable } from 'rxjs'
 import { debounceTime } from 'rxjs/operators'
 import { BrowserWindow, app, ipcMain, Rectangle, Menu, screen } from 'electron'
@@ -8,12 +13,8 @@ import * as path from 'path'
 import { parseArgs } from './cli'
 import { loadConfig } from './config'
 
-let SetWindowCompositionAttribute: any
-let AccentState: any
 let DwmEnableBlurBehindWindow: any
 if (process.platform === 'win32') {
-    SetWindowCompositionAttribute = require('windows-swca').SetWindowCompositionAttribute
-    AccentState = require('windows-swca').ACCENT_STATE
     DwmEnableBlurBehindWindow = require('windows-blurbehind').DwmEnableBlurBehindWindow
 }
 
@@ -82,11 +83,8 @@ export class Window {
             }
         }
 
-        if (process.platform === 'linux') {
-            bwOptions.backgroundColor = '#131d27'
-        }
-
         this.window = new BrowserWindow(bwOptions)
+
         this.window.once('ready-to-show', () => {
             if (process.platform === 'darwin') {
                 this.window.setVibrancy('window')
@@ -134,18 +132,17 @@ export class Window {
         this.lastVibrancy = { enabled, type }
         if (process.platform === 'win32') {
             if (parseFloat(os.release()) >= 10) {
-                let attribValue = AccentState.ACCENT_DISABLED
-                if (enabled) {
-                    if (type === 'fluent') {
-                        attribValue = AccentState.ACCENT_ENABLE_ACRYLICBLURBEHIND
-                    } else {
-                        attribValue = AccentState.ACCENT_ENABLE_BLURBEHIND
-                    }
-                }
-                SetWindowCompositionAttribute(this.window.getNativeWindowHandle(), attribValue, 0x00000000)
+                glasstron.update(this.window, {
+                    windows: { blurType: enabled ? type === 'fluent' ? 'acrylic' : 'blurbehind' : null },
+                })
             } else {
                 DwmEnableBlurBehindWindow(this.window, enabled)
             }
+        } else if (process.platform ==='linux') {
+            glasstron.update(this.window, {
+                linux: { requestBlur: enabled },
+            })
+            this.window.setBackgroundColor(enabled ? '#00000000' : '#131d27')
         } else {
             this.window.setVibrancy(enabled ? 'dark' : null as any) // electron issue 20269
         }

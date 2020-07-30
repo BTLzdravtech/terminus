@@ -271,6 +271,33 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "3l0w",
+      "name": "Gwilherm Folliot",
+      "avatar_url": "https://avatars2.githubusercontent.com/u/37798980?v=4",
+      "profile": "https://github.com/3l0w",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "dimitory",
+      "name": "Dmitry Pronin",
+      "avatar_url": "https://avatars0.githubusercontent.com/u/475955?v=4",
+      "profile": "https://github.com/Dimitory",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "JonathanBeverley",
+      "name": "Jonathan Beverley",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/20328966?v=4",
+      "profile": "https://github.com/JonathanBeverley",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
