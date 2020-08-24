@@ -157,6 +157,10 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
     /** @hidden */
     _spanners: SplitSpannerInfo[] = []
 
+    /** @hidden */
+    _allFocusMode = false
+
+    /** @hidden */
     private focusedTab: BaseTabComponent
     private maximizedTab: BaseTabComponent|null = null
     private hotkeysSubscription: Subscription
@@ -254,12 +258,13 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
         if (this._recoveredState) {
             await this.recoverContainer(this.root, this._recoveredState)
             this.layout()
-            setImmediate(() => {
+            setTimeout(() => {
                 if (this.hasFocus) {
-                    this.getAllTabs().forEach(x => x.emitFocused())
-                    this.focusAnyIn(this.root)
+                    for (const tab of this.getAllTabs()) {
+                        this.focus(tab)
+                    }
                 }
-            })
+            }, 100)
         }
         this.initialized.next()
         this.initialized.complete()
@@ -480,6 +485,12 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
         }
     }
 
+    layout (): void {
+        this.root.normalize()
+        this._spanners = []
+        this.layoutInternal(this.root, 0, 0, 100, 100)
+    }
+
     private attachTabView (tab: BaseTabComponent) {
         const ref = this.viewContainer.insert(tab.hostView) as EmbeddedViewRef<any> // eslint-disable-line @typescript-eslint/no-unnecessary-type-assertion
         this.viewRefs.set(tab, ref)
@@ -503,12 +514,6 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
             this.viewRefs.delete(tab)
             this.viewContainer.remove(this.viewContainer.indexOf(ref))
         }
-    }
-
-    private layout () {
-        this.root.normalize()
-        this._spanners = []
-        this.layoutInternal(this.root, 0, 0, 100, 100)
     }
 
     private layoutInternal (root: SplitContainer, x: number, y: number, w: number, h: number) {
@@ -535,7 +540,7 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
                     element.classList.toggle('child', true)
                     element.classList.toggle('maximized', child === this.maximizedTab)
                     element.classList.toggle('minimized', this.maximizedTab && child !== this.maximizedTab)
-                    element.classList.toggle('focused', child === this.focusedTab)
+                    element.classList.toggle('focused', this._allFocusMode || child === this.focusedTab)
                     element.style.left = `${childX}%`
                     element.style.top = `${childY}%`
                     element.style.width = `${childW}%`
