@@ -134,7 +134,7 @@ export class SSHTabComponent extends BaseTerminalTabComponent {
 
         await this.setupOneSession(this.session)
 
-        this.attachSessionHandlers()
+        this.attachSessionHandlers(true)
 
         await this.session.start()
         this.session.resize(this.size.columns, this.size.rows)
