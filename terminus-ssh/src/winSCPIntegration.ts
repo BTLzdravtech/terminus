@@ -1,6 +1,6 @@
 import { execFile } from 'child_process'
 import { Injectable } from '@angular/core'
-import { ConfigService, BaseTabComponent, TabContextMenuItemProvider, TabHeaderComponent, HostAppService, Platform } from 'terminus-core'
+import { ConfigService, BaseTabComponent, TabContextMenuItemProvider, TabHeaderComponent, HostAppService, Platform, SplitTabComponent } from 'terminus-core'
 import { SSHTabComponent } from './components/sshTab.component'
 import { PasswordStorageService } from './services/passwordStorage.service'
 import { SSHConnection } from './api'
@@ -37,23 +37,41 @@ export class WinSCPContextMenu extends TabContextMenuItemProvider {
     }
 
     async getItems (tab: BaseTabComponent, tabHeader?: TabHeaderComponent): Promise<Electron.MenuItemConstructorOptions[]> {
-        if (this.hostApp.platform !== Platform.Windows || tabHeader) {
+        if (this.hostApp.platform !== Platform.Windows) {
             return []
         }
         if (!this.getPath()) {
             return []
         }
-        if (!(tab instanceof SSHTabComponent)) {
-            return []
-        }
-        return [
-            {
-                label: 'Launch WinSCP',
-                click: (): void => {
-                    this.launchWinSCP(tab.connection)
+        if (tabHeader) {
+            if (!(tab instanceof SplitTabComponent)) {
+                return []
+            }
+            const focusedTab = (tab as SplitTabComponent).getFocusedTab()
+            if (!(focusedTab instanceof SSHTabComponent)) {
+                return []
+            }
+            return [
+                {
+                    label: 'Launch WinSCP',
+                    click: (): void => {
+                        this.launchWinSCP((focusedTab as SSHTabComponent).connection)
+                    },
                 },
-            },
-        ]
+            ]
+        } else {
+            if (!(tab instanceof SSHTabComponent)) {
+                return []
+            }
+            return [
+                {
+                    label: 'Launch WinSCP',
+                    click: (): void => {
+                        this.launchWinSCP(tab.connection)
+                    },
+                },
+            ]
+        }
     }
 
     getPath (): string|undefined {
