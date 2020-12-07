@@ -298,6 +298,42 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "zend",
+      "name": "Zenghai Liang",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/25160?v=4",
+      "profile": "https://github.com/zend",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "matishadow",
+      "name": "Mateusz Tracz",
+      "avatar_url": "https://avatars0.githubusercontent.com/u/9083085?v=4",
+      "profile": "https://about.me/matishadow",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "pinpins",
+      "name": "pinpin",
+      "avatar_url": "https://avatars3.githubusercontent.com/u/36234677?v=4",
+      "profile": "https://zergpool.com",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "TakuroOnoda",
+      "name": "Takuro Onoda",
+      "avatar_url": "https://avatars0.githubusercontent.com/u/1407926?v=4",
+      "profile": "https://github.com/TakuroOnoda",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,

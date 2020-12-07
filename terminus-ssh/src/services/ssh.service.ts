@@ -18,6 +18,15 @@ import { SSHTabComponent } from '../components/sshTab.component'
 
 const WINDOWS_OPENSSH_AGENT_PIPE = '\\\\.\\pipe\\openssh-ssh-agent'
 
+try {
+    var windowsProcessTreeNative = require('windows-process-tree/build/Release/windows_process_tree.node') // eslint-disable-line @typescript-eslint/no-var-requires, no-var
+} catch { }
+
+
+// eslint-disable-next-line @typescript-eslint/no-type-alias
+export type SSHLogCallback = (message: string) => void
+
+
 @Injectable({ providedIn: 'root' })
 export class SSHService {
     private logger: Logger
@@ -42,33 +51,24 @@ export class SSHService {
         return session
     }
 
-    async connectSession (session: SSHSession, logCallback?: (s: any) => void): Promise<void> {
+    async loadPrivateKeyForSession (session: SSHSession, logCallback?: SSHLogCallback): Promise<string|null> {
         let privateKey: string|null = null
         let privateKeyPath = session.connection.privateKey
-
-        if (!logCallback) {
-            logCallback = () => null
-        }
-
-        const log = (s: any) => {
-            logCallback!(s)
-            this.logger.info(s)
-        }
 
         if (!privateKeyPath) {
             const userKeyPath = path.join(process.env.HOME as string, '.ssh', 'id_rsa')
             if (await fs.exists(userKeyPath)) {
-                log('Using user\'s default private key')
+                logCallback?.('Using user\'s default private key')
                 privateKeyPath = userKeyPath
             }
         }
 
         if (privateKeyPath) {
-            log('Loading private key from ' + colors.bgWhite.blackBright(' ' + privateKeyPath + ' '))
+            logCallback?.('Loading private key from ' + colors.bgWhite.blackBright(' ' + privateKeyPath + ' '))
             try {
                 privateKey = (await fs.readFile(privateKeyPath)).toString()
             } catch (error) {
-                log(colors.bgRed.black(' X ') + 'Could not read the private key file')
+                logCallback?.(colors.bgRed.black(' X ') + 'Could not read the private key file')
                 this.toastr.error('Could not read the private key file')
             }
 
@@ -79,7 +79,7 @@ export class SSHService {
                 } catch (e) {
                     if (e instanceof sshpk.KeyEncryptedError) {
                         const modal = this.ngbModal.open(PromptModalComponent)
-                        log(colors.bgYellow.yellow.black(' ! ') + ' Key requires passphrase')
+                        logCallback?.(colors.bgYellow.yellow.black(' ! ') + ' Key requires passphrase')
                         modal.componentInstance.prompt = 'Private key passphrase'
                         modal.componentInstance.password = true
                         let passphrase = ''
@@ -112,8 +112,9 @@ export class SSHService {
                         'ssh-keygen.exe',
                     )
                     await execFile('icacls', [temp.path, '/inheritance:r'])
-                    let sid = await execFile('whoami', ['/user', '/nh'])
-                    sid = sid[0].split(' ')[0]
+                    let sid = await execFile('whoami', ['/user', '/nh', '/fo', 'csv'])
+                    sid = sid[0].split(',')[0]
+                    sid = sid.substring(1, sid.length - 1)
                     await execFile('icacls', [temp.path, '/grant:r', `${sid}:(R,W)`])
                 }
 
@@ -126,6 +127,20 @@ export class SSHService {
                 fs.unlink(temp.path)
             }
         }
+        return privateKey
+    }
+
+    async connectSession (session: SSHSession, logCallback?: SSHLogCallback): Promise<void> {
+        if (!logCallback) {
+            logCallback = () => null
+        }
+
+        const log = (s: any) => {
+            logCallback!(s)
+            this.logger.info(s)
+        }
+
+        let privateKey: string|null = null
 
         const ssh = new Client()
         session.ssh = ssh
@@ -193,7 +208,14 @@ export class SSHService {
                 if (await fs.exists(WINDOWS_OPENSSH_AGENT_PIPE)) {
                     agent = WINDOWS_OPENSSH_AGENT_PIPE
                 } else {
-                    agent = 'pageant'
+                    const pageantRunning = await new Promise<boolean>(resolve => {
+                        windowsProcessTreeNative.getProcessList(list => { // eslint-disable-line block-scoped-var
+                            resolve(list.some(x => x.name === 'pageant.exe'))
+                        }, 0)
+                    })
+                    if (pageantRunning) {
+                        agent = 'pageant'
+                    }
                 }
             } else {
                 agent = process.env.SSH_AUTH_SOCK as string
@@ -201,6 +223,7 @@ export class SSHService {
 
             const authMethodsLeft = ['none']
             if (!session.connection.auth || session.connection.auth === 'publicKey') {
+                privateKey = await this.loadPrivateKeyForSession(session, log)
                 if (!privateKey) {
                     log('\r\nPrivate key auth selected, but no key is loaded\r\n')
                 } else {
