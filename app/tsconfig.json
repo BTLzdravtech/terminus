@@ -18,6 +18,7 @@
            "es2015",
            "es2015.iterable",
            "es2017",
+           "es2019",
            "es7"
         ]
     },
@@ -26,7 +27,7 @@
         "dist",
         "node_modules",
         "*/node_modules",
-        "terminus*",
+        "tabby*",
         "platforms"
     ]
 }

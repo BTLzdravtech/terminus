@@ -1,12 +1,14 @@
-module.exports = [
-    require('./app/webpack.config.js'),
-    require('./app/webpack.main.config.js'),
-    require('./terminus-core/webpack.config.js'),
-    require('./terminus-settings/webpack.config.js'),
-    require('./terminus-terminal/webpack.config.js'),
-    require('./terminus-community-color-schemes/webpack.config.js'),
-    require('./terminus-plugin-manager/webpack.config.js'),
-    require('./terminus-ssh/webpack.config.js'),
-    require('./terminus-serial/webpack.config.js'),
-    require('./terminus-theme-hype/webpack.config.js'),
+const log = require('npmlog')
+const { builtinPlugins } = require('./scripts/vars')
+
+const paths = [
+    './app/webpack.config.js',
+    './app/webpack.main.config.js',
+    './web/webpack.config.js',
+    './tabby-web-demo/webpack.config.js',
+    ...builtinPlugins.map(x => `./${x}/webpack.config.js`),
 ]
+
+paths.forEach(x => log.info(`Using config: ${x}`))
+
+module.exports = paths.map(x => require(x))

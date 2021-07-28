@@ -1,6 +1,8 @@
 parser: '@typescript-eslint/parser'
 parserOptions:
-  project: tsconfig.json
+  project:
+  - tsconfig.json
+  - '*/tsconfig.typings.json'
 extends:
   - 'plugin:@typescript-eslint/all'
 plugins:
@@ -29,14 +31,17 @@ rules:
   '@typescript-eslint/no-magic-numbers': off
   '@typescript-eslint/member-delimiter-style': off
   '@typescript-eslint/promise-function-async': off
-  '@typescript-eslint/no-unnecessary-type-assertion': off
   '@typescript-eslint/require-array-sort-compare': off
   '@typescript-eslint/no-floating-promises': off
   '@typescript-eslint/prefer-readonly': off
   '@typescript-eslint/require-await': off
   '@typescript-eslint/strict-boolean-expressions': off
-  '@typescript-eslint/no-misused-promises': off
+  '@typescript-eslint/no-misused-promises':
+  - error
+  - checksVoidReturn: false
   '@typescript-eslint/typedef': off
+  '@typescript-eslint/consistent-type-imports': off
+  '@typescript-eslint/sort-type-union-intersection-members': off
   '@typescript-eslint/no-use-before-define':
   - error
   - classes: false
@@ -53,7 +58,8 @@ rules:
   computed-property-spacing:
   - error
   - never
-  comma-dangle:
+  comma-dangle: off
+  '@typescript-eslint/comma-dangle':
   - error
   - always-multiline
   curly: error
@@ -61,9 +67,6 @@ rules:
   eqeqeq:
   - error
   - smart
-  linebreak-style:
-  - error
-  - unix
   max-depth:
   - 1
   - 5
@@ -80,7 +83,8 @@ rules:
       argsIgnorePattern: ^_
   no-undef: error
   no-var: error
-  object-curly-spacing:
+  object-curly-spacing: off
+  '@typescript-eslint/object-curly-spacing':
   - error
   - always
   quote-props:
@@ -93,14 +97,27 @@ rules:
   - error
   - single
   - allowTemplateLiterals: true
+  '@typescript-eslint/no-confusing-void-expression':
+  - error
+  - ignoreArrowShorthand: true
   '@typescript-eslint/no-non-null-assertion': off
-  '@typescript-eslint/no-unnecessary-condition': off
-  '@typescript-eslint/no-untyped-public-signature': off # bugs out on constructors
+  '@typescript-eslint/no-unnecessary-condition':
+  - error
+  - allowConstantLoopConditions: true
   '@typescript-eslint/restrict-template-expressions': off
-  '@typescript-eslint/no-dynamic-delete': off
-  '@typescript-eslint/prefer-nullish-coalescing': off
   '@typescript-eslint/prefer-readonly-parameter-types': off
   '@typescript-eslint/no-unsafe-member-access': off
   '@typescript-eslint/no-unsafe-call': off
   '@typescript-eslint/no-unsafe-return': off
-  '@typescript-eslint/no-base-to-string': off # broken in typescript-eslint
+  '@typescript-eslint/no-unsafe-assignment': off
+  '@typescript-eslint/naming-convention': off
+  '@typescript-eslint/lines-between-class-members':
+  - error
+  - exceptAfterSingleLine: true
+  '@typescript-eslint/dot-notation': off
+  '@typescript-eslint/no-implicit-any-catch': off
+  '@typescript-eslint/member-ordering': off
+  '@typescript-eslint/no-var-requires': off
+  '@typescript-eslint/no-unsafe-argument': off
+  '@typescript-eslint/restrict-plus-operands': off
+  '@typescript-eslint/space-infix-ops': off

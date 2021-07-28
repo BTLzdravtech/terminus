@@ -1,31 +1,56 @@
 ---
-appId: org.terminus
-productName: Terminus
+appId: org.tabby
+productName: Tabby
 compression: normal
+npmRebuild: false
 afterSign: "./build/mac/afterSignHook.js"
 afterAllArtifactBuild: "./build/mac/afterBuildHook.js"
 files:
-- "**/*"
+- '**/*'
 - dist
+- '!lib'
+- '!src'
+- '!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme,node.lib}'
+- '!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples,docs}'
+- '!**/node_modules/@angular/common/locales'
+- '!**/node_modules/@angular/compiler/src'
+- '!**/node_modules/node-gyp'
+- '!**/node_modules/**/*.d.ts'
+- '!**/node_modules/**/*.map'
+- '!**/node_modules/**/include/node'
+- '!**/node_modules/.bin'
+- '!**/node_modules/*/*/{esm5,fesm5,esm2015,fesm2015,_esm2015,_fesm2015}'
+- '!**/*.{woff,ttf,otf,eot}'
+- '!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}'
+- '!.editorconfig'
+- '!**/._*'
+- '!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}'
+- '!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}'
+- '!**/{appveyor.yml,.travis.yml,circle.yml}'
+- '!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}'
+- '!**/deps/cpu_features/build'
 extraResources:
 - builtin-plugins
 - extras
+asarUnpack:
+- 'dist/*.map'
 publish:
 - provider: github
 
 win:
   icon: "./build/windows/icon.ico"
-  artifactName: terminus-${version}-portable.${ext}
+  artifactName: tabby-${version}-portable.${ext}
   rfc3161TimeStampServer: http://sha256timestamp.ws.symantec.com/sha256/timestamp
 nsis:
   oneClick: false
-  artifactName: terminus-${version}-setup.${ext}
+  artifactName: tabby-${version}-setup.${ext}
   installerIcon: "./build/windows/icon.ico"
+  allowToChangeInstallationDirectory: true
 
 mac:
   category: public.app-category.video
   icon: "./build/mac/icon.icns"
-  artifactName: terminus-${version}-macos.${ext}
+  artifactName: tabby-${version}-macos-${env.ARCH}.${ext}
   hardenedRuntime: true
   entitlements: "./build/mac/entitlements.plist"
   entitlementsInherit: "./build/mac/entitlements.plist"
@@ -40,15 +65,14 @@ mac:
     NSNetworkVolumesUsageDescription: 'A subprocess requests access to files on a network volume.'
     NSRemovableVolumesUsageDescription: 'A subprocess requests access to files on a removable volume.'
 
-pkg:
-  artifactName: terminus-${version}-macos.pkg
-
 linux:
-  category: Utilities
+  category: Utility
   icon: "./build/icons"
-  artifactName: terminus-${version}-linux.${ext}
+  artifactName: tabby-${version}-linux.${ext}
   executableArgs:
   - "--no-sandbox"
+  desktop:
+    StartupWMClass: tabby
 snap:
   plugs:
   - default
@@ -65,7 +89,18 @@ deb:
   - libxtst6
   - libnss3
   afterInstall: build/linux/after-install.tpl
+  fpm:
+  - '--replaces'
+  - 'terminus-terminal'
+pacman:
+  depends:
+  - gnome-keyring
+  - libsecret
 rpm:
   depends:
-  - screen
   - gnome-keyring
+  fpm:
+  - '--rpm-rpmbuild-define'
+  - '_build_id_links none'
+  - '--replaces'
+  - 'terminus-terminal'

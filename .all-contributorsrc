@@ -334,10 +334,109 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "frauhottelmann",
+      "name": "frauhottelmann",
+      "avatar_url": "https://avatars2.githubusercontent.com/u/902705?v=4",
+      "profile": "https://github.com/frauhottelmann",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "VectorKappa",
+      "name": "Piotr Patalong",
+      "avatar_url": "https://avatars.githubusercontent.com/u/29167842?v=4",
+      "profile": "http://patalong.pl",
+      "contributions": [
+        "design"
+      ]
+    },
+    {
+      "login": "clarkwang",
+      "name": "Clark Wang",
+      "avatar_url": "https://avatars.githubusercontent.com/u/157076?v=4",
+      "profile": "https://github.com/clarkwang",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "iamchating",
+      "name": "iamchating",
+      "avatar_url": "https://avatars.githubusercontent.com/u/7088153?v=4",
+      "profile": "https://github.com/iamchating",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "starxg",
+      "name": "starxg",
+      "avatar_url": "https://avatars.githubusercontent.com/u/34997494?v=4",
+      "profile": "https://github.com/starxg",
+      "contributions": [
+        "plugin"
+      ]
+    },
+    {
+      "login": "lambdalisue",
+      "name": "Alisue",
+      "avatar_url": "https://avatars.githubusercontent.com/u/546312?v=4",
+      "profile": "http://hashnote.net/",
+      "contributions": [
+        "design"
+      ]
+    },
+    {
+      "login": "ydcool",
+      "name": "Dominic Yin",
+      "avatar_url": "https://avatars.githubusercontent.com/u/5668295?v=4",
+      "profile": "https://github.com/ydcool",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "bdr99",
+      "name": "Brandon Rothweiler",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2292715?v=4",
+      "profile": "https://github.com/bdr99",
+      "contributions": [
+        "design"
+      ]
+    },
+    {
+      "login": "logicmachine123",
+      "name": "Logic Machine",
+      "avatar_url": "https://avatars.githubusercontent.com/u/63876444?v=4",
+      "profile": "https://git.io/JnP49",
+      "contributions": [
+        "doc"
+      ]
+    },
+    {
+      "login": "cypherbits",
+      "name": "cypherbits",
+      "avatar_url": "https://avatars.githubusercontent.com/u/10424900?v=4",
+      "profile": "https://github.com/cypherbits",
+      "contributions": [
+        "doc"
+      ]
+    },
+    {
+      "login": "KingMob",
+      "name": "Matthew Davidson",
+      "avatar_url": "https://avatars.githubusercontent.com/u/946421?v=4",
+      "profile": "https://modulolotus.net",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
-  "projectName": "terminus",
+  "projectName": "tabby",
   "projectOwner": "Eugeny",
   "repoType": "github",
   "repoHost": "https://github.com",

@@ -1,0 +1,9 @@
+.modal-header
+    h5.m-0 Port forwarding
+
+.modal-body.pt-0
+    ssh-port-forwarding-config(
+        [model]='session.forwardedPorts',
+        (forwardAdded)='onForwardAdded($event)',
+        (forwardRemoved)='onForwardRemoved($event)'
+    )

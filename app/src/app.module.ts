@@ -13,9 +13,10 @@ export function getRootModule (plugins: any[]) {
             positionClass: 'toast-bottom-center',
             toastClass: 'toast',
             preventDuplicates: true,
-            extendedTimeOut: 5000,
+            extendedTimeOut: 1000,
         }),
     ]
+
     const bootstrap = [
         ...plugins.filter(x => x.bootstrap).map(x => x.bootstrap),
     ]

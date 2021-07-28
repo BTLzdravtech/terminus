@@ -1,25 +1,50 @@
-import { app, ipcMain, Menu, Tray, shell, globalShortcut } from 'electron'
-// eslint-disable-next-line no-duplicate-imports
-import * as electron from 'electron'
+import { app, ipcMain, Menu, Tray, shell, screen, globalShortcut, MenuItemConstructorOptions } from 'electron'
+import * as promiseIpc from 'electron-promise-ipc'
+import * as remote from '@electron/remote/main'
+import * as path from 'path'
+import * as fs from 'fs'
+
 import { loadConfig } from './config'
 import { Window, WindowOptions } from './window'
+import { pluginManager } from './pluginManager'
+import { PTYManager } from './pty'
+
+/* eslint-disable block-scoped-var */
+
+try {
+    var wnr = require('windows-native-registry') // eslint-disable-line @typescript-eslint/no-var-requires, no-var
+} catch (_) { }
 
 export class Application {
-    private tray: Tray
+    private tray?: Tray
+    private ptyManager = new PTYManager()
     private windows: Window[] = []
+    userPluginsPath: string
 
     constructor () {
+        remote.initialize()
+        this.useBuiltinGraphics()
+        this.ptyManager.init(this)
+
         ipcMain.on('app:config-change', (_event, config) => {
             this.broadcast('host:config-change', config)
         })
 
         ipcMain.on('app:register-global-hotkey', (_event, specs) => {
             globalShortcut.unregisterAll()
-            for (let spec of specs) {
+            for (const spec of specs) {
                 globalShortcut.register(spec, () => {
                     this.onGlobalHotkey()
                 })
             }
+        })
+
+        ;(promiseIpc as any).on('plugin-manager:install', (name, version) => {
+            return pluginManager.install(this.userPluginsPath, name, version)
+        })
+
+        ;(promiseIpc as any).on('plugin-manager:uninstall', (name) => {
+            return pluginManager.uninstall(this.userPluginsPath, name)
         })
 
         const configData = loadConfig()
@@ -31,7 +56,17 @@ export class Application {
             }
         }
 
+        this.userPluginsPath = path.join(
+            app.getPath('userData'),
+            'plugins',
+        )
+
+        if (!fs.existsSync(this.userPluginsPath)) {
+            fs.mkdirSync(this.userPluginsPath)
+        }
+
         app.commandLine.appendSwitch('disable-http-cache')
+        app.commandLine.appendSwitch('max-active-webgl-contexts', '9000')
         app.commandLine.appendSwitch('lang', 'EN')
         app.allowRendererProcessReuse = false
 
@@ -41,11 +76,13 @@ export class Application {
     }
 
     init (): void {
-        electron.screen.on('display-metrics-changed', () => this.broadcast('host:display-metrics-changed'))
+        screen.on('display-metrics-changed', () => this.broadcast('host:display-metrics-changed'))
+        screen.on('display-added', () => this.broadcast('host:displays-changed'))
+        screen.on('display-removed', () => this.broadcast('host:displays-changed'))
     }
 
     async newWindow (options?: WindowOptions): Promise<Window> {
-        let window = new Window(options)
+        const window = new Window(this, options)
         this.windows.push(window)
         window.visible$.subscribe(visible => {
             if (visible) {
@@ -65,30 +102,30 @@ export class Application {
     }
 
     onGlobalHotkey (): void {
-        if (this.windows.some(x => x.isFocused())) {
-            for (let window of this.windows) {
+        if (this.windows.some(x => x.isFocused() && x.isVisible())) {
+            for (const window of this.windows) {
                 window.hide()
             }
         } else {
-            for (let window of this.windows) {
+            for (const window of this.windows) {
                 window.present()
             }
         }
     }
 
     presentAllWindows (): void {
-        for (let window of this.windows) {
+        for (const window of this.windows) {
             window.present()
         }
     }
 
-    broadcast (event: string, ...args): void {
+    broadcast (event: string, ...args: any[]): void {
         for (const window of this.windows) {
             window.send(event, ...args)
         }
     }
 
-    async send (event: string, ...args): Promise<void> {
+    async send (event: string, ...args: any[]): Promise<void> {
         if (!this.hasWindows()) {
             await this.newWindow()
         }
@@ -96,7 +133,7 @@ export class Application {
     }
 
     enableTray (): void {
-        if (this.tray) {
+        if (this.tray || process.platform === 'linux') {
             return
         }
         if (process.platform === 'darwin') {
@@ -117,14 +154,15 @@ export class Application {
             this.tray.setContextMenu(contextMenu)
         }
 
-        this.tray.setToolTip(`Terminus ${app.getVersion()}`)
+        this.tray.setToolTip(`Tabby ${app.getVersion()}`)
     }
 
     disableTray (): void {
-        if (this.tray) {
-            this.tray.destroy()
-            this.tray = null
+        if (process.platform === 'linux') {
+            return
         }
+        this.tray?.destroy()
+        this.tray = null
     }
 
     hasWindows (): boolean {
@@ -132,22 +170,32 @@ export class Application {
     }
 
     focus (): void {
-        for (let window of this.windows) {
+        for (const window of this.windows) {
             window.show()
         }
     }
 
     handleSecondInstance (argv: string[], cwd: string): void {
         this.presentAllWindows()
-        this.windows[this.windows.length - 1].handleSecondInstance(argv, cwd)
+        this.windows[this.windows.length - 1].passCliArguments(argv, cwd, true)
+    }
+
+    private useBuiltinGraphics (): void {
+        if (process.platform === 'win32') {
+            const keyPath = 'SOFTWARE\\Microsoft\\DirectX\\UserGpuPreferences'
+            const valueName = app.getPath('exe')
+            if (!wnr.getRegistryValue(wnr.HK.CU, keyPath, valueName)) {
+                wnr.setRegistryValue(wnr.HK.CU, keyPath, valueName, wnr.REG.SZ, 'GpuPreference=1;')
+            }
+        }
     }
 
     private setupMenu () {
-        let template: Electron.MenuItemConstructorOptions[] = [
+        const template: MenuItemConstructorOptions[] = [
             {
                 label: 'Application',
                 submenu: [
-                    { role: 'about', label: 'About Terminus' },
+                    { role: 'about', label: 'About Tabby' },
                     { type: 'separator' },
                     {
                         label: 'Preferences',
@@ -193,12 +241,7 @@ export class Application {
                 label: 'View',
                 submenu: [
                     { role: 'reload' },
-                    { role: 'forceReload' },
                     { role: 'toggleDevTools' },
-                    { type: 'separator' },
-                    { role: 'resetZoom' },
-                    { role: 'zoomIn' },
-                    { role: 'zoomOut' },
                     { type: 'separator' },
                     { role: 'togglefullscreen' },
                 ],
@@ -218,7 +261,7 @@ export class Application {
                     {
                         label: 'Website',
                         click () {
-                            shell.openExternal('https://eugeny.github.io/terminus')
+                            shell.openExternal('https://eugeny.github.io/tabby')
                         },
                     },
                 ],

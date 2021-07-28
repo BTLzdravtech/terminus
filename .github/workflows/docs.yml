@@ -3,15 +3,18 @@ on: push
 jobs:
   build:
     runs-on: ubuntu-18.04
+    if: ${{ github.actor != 'dependabot[bot]' }}
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v1
+      uses: actions/checkout@v2.3.4
+      with:
+        fetch-depth: 0
 
     - name: Installing Node
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@v2.2.0
       with:
-        node-version: 10
+        node-version: 14
 
     - name: Build
       run: |
@@ -23,6 +26,7 @@ jobs:
         cd ..
         rm app/node_modules/.yarn-integrity
         yarn
+        yarn run build:typings
         yarn run docs
         rsync -e "ssh -o StrictHostKeyChecking=no" -arv docs/api/ root@ajenti.org:/srv/terminus-docs/
 

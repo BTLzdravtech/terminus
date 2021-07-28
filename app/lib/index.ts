@@ -1,4 +1,6 @@
+import 'v8-compile-cache'
 import './portable'
+import 'source-map-support/register'
 import './sentry'
 import './lru'
 import { app, ipcMain, Menu } from 'electron'
@@ -6,8 +8,8 @@ import { parseArgs } from './cli'
 import { Application } from './app'
 import electronDebug = require('electron-debug')
 
-if (!process.env.TERMINUS_PLUGINS) {
-    process.env.TERMINUS_PLUGINS = ''
+if (!process.env.TABBY_PLUGINS) {
+    process.env.TABBY_PLUGINS = ''
 }
 
 const application = new Application()
@@ -52,7 +54,7 @@ if (argv.d) {
     })
 }
 
-app.on('ready', () => {
+app.on('ready', async () => {
     if (process.platform === 'darwin') {
         app.dock.setMenu(Menu.buildFromTemplate([
             {
@@ -64,5 +66,8 @@ app.on('ready', () => {
         ]))
     }
     application.init()
-    application.newWindow({ hidden: argv.hidden })
+
+    const window = await application.newWindow({ hidden: argv.hidden })
+    await window.ready
+    window.passCliArguments(process.argv, process.cwd(), false)
 })

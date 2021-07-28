@@ -1,0 +1,34 @@
+appearance:
+  dock: off
+  dockScreen: current
+  dockFill: 0.5
+  dockSpace: 1
+  dockHideOnBlur: false
+  dockAlwaysOnTop: true
+  flexTabs: false
+  tabsLocation: top
+  cycleTabs: true
+  theme: Standard
+  frame: thin
+  css: '/* * { color: blue !important; } */'
+  opacity: 1.0
+  vibrancy: true
+  vibrancyType: 'blur'
+terminal:
+  showBuiltinProfiles: true
+  showRecentProfiles: 3
+hotkeys:
+  profile:
+    __nonStructural: true
+profiles: []
+recentProfiles: []
+recoverTabs: true
+enableAnalytics: true
+enableWelcomeTab: true
+electronFlags:
+  - ['force_discrete_gpu', '0']
+enableAutomaticUpdates: true
+version: 1
+vault: null
+encrypted: false
+enableExperimentalFeatures: false

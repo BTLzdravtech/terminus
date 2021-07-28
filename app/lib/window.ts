@@ -1,19 +1,18 @@
 import * as glasstron from 'glasstron'
-if (process.platform === 'win32' || process.platform === 'linux') {
-    glasstron.init()
-}
 
-import { Subject, Observable } from 'rxjs'
-import { debounceTime } from 'rxjs/operators'
-import { BrowserWindow, app, ipcMain, Rectangle, Menu, screen } from 'electron'
+import { Subject, Observable, debounceTime } from 'rxjs'
+import { BrowserWindow, app, ipcMain, Rectangle, Menu, screen, BrowserWindowConstructorOptions } from 'electron'
 import ElectronConfig = require('electron-config')
 import * as os from 'os'
 import * as path from 'path'
+import macOSRelease from 'macos-release'
+import * as compareVersions from 'compare-versions'
 
+import type { Application } from './app'
 import { parseArgs } from './cli'
 import { loadConfig } from './config'
 
-let DwmEnableBlurBehindWindow: any
+let DwmEnableBlurBehindWindow: any = null
 if (process.platform === 'win32') {
     DwmEnableBlurBehindWindow = require('windows-blurbehind').DwmEnableBlurBehindWindow
 }
@@ -22,41 +21,51 @@ export interface WindowOptions {
     hidden?: boolean
 }
 
+abstract class GlasstronWindow extends BrowserWindow {
+    blurType: string
+    abstract setBlur (_: boolean)
+}
+
+const macOSVibrancyType = process.platform === 'darwin' ? compareVersions.compare(macOSRelease().version, '10.14', '>=') ? 'fullscreen-ui' : 'dark' : null
+
 export class Window {
     ready: Promise<void>
     private visible = new Subject<boolean>()
     private closed = new Subject<void>()
-    private window: BrowserWindow
+    private window?: GlasstronWindow
     private windowConfig: ElectronConfig
-    private windowBounds: Rectangle
+    private windowBounds?: Rectangle
     private closing = false
-    private lastVibrancy: {enabled: boolean, type?: string} | null = null
+    private lastVibrancy: { enabled: boolean, type?: string } | null = null
     private disableVibrancyWhileDragging = false
     private configStore: any
 
     get visible$ (): Observable<boolean> { return this.visible }
     get closed$ (): Observable<void> { return this.closed }
 
-    constructor (options?: WindowOptions) {
+    constructor (private application: Application, options?: WindowOptions) {
         this.configStore = loadConfig()
 
-        options = options || {}
+        options = options ?? {}
 
         this.windowConfig = new ElectronConfig({ name: 'window' })
         this.windowBounds = this.windowConfig.get('windowBoundaries')
 
-        let maximized = this.windowConfig.get('maximized')
-        let bwOptions: Electron.BrowserWindowConstructorOptions = {
+        const maximized = this.windowConfig.get('maximized')
+        const bwOptions: BrowserWindowConstructorOptions = {
             width: 800,
             height: 600,
-            title: 'Terminus',
+            title: 'Tabby',
             minWidth: 400,
             minHeight: 300,
             webPreferences: {
                 nodeIntegration: true,
                 preload: path.join(__dirname, 'sentry.js'),
                 backgroundThrottling: false,
+                enableRemoteModule: true,
+                contextIsolation: false,
             },
+            maximizable: true,
             frame: false,
             show: false,
             backgroundColor: '#00000000',
@@ -79,15 +88,19 @@ export class Window {
             bwOptions.frame = true
         } else {
             if (process.platform === 'darwin') {
-                bwOptions.titleBarStyle = 'hiddenInset'
+                bwOptions.titleBarStyle = 'hidden'
             }
         }
 
-        this.window = new BrowserWindow(bwOptions)
+        if (process.platform === 'darwin') {
+            this.window = new BrowserWindow(bwOptions) as GlasstronWindow
+        } else {
+            this.window = new glasstron.BrowserWindow(bwOptions)
+        }
 
         this.window.once('ready-to-show', () => {
             if (process.platform === 'darwin') {
-                this.window.setVibrancy('window')
+                this.window.setVibrancy(macOSVibrancyType)
             } else if (process.platform === 'win32' && (this.configStore.appearance || {}).vibrancy) {
                 this.setVibrancy(true)
             }
@@ -104,12 +117,15 @@ export class Window {
         })
 
         this.window.on('blur', () => {
-            if (this.configStore.appearance?.dockHideOnBlur) {
+            if ((this.configStore.appearance?.dock ?? 'off') !== 'off' && this.configStore.appearance?.dockHideOnBlur) {
                 this.hide()
             }
         })
 
-        this.window.loadURL(`file://${app.getAppPath()}/dist/index.html?${this.window.id}`, { extraHeaders: 'pragma: no-cache\n' })
+        this.window.loadURL(`file://${app.getAppPath()}/dist/index.html`, { extraHeaders: 'pragma: no-cache\n' })
+
+        this.window.webContents.setVisualZoomLevelLimits(1, 1)
+        this.window.webContents.setZoomFactor(1)
 
         if (process.platform !== 'darwin') {
             this.window.setMenu(null)
@@ -128,23 +144,26 @@ export class Window {
         })
     }
 
-    setVibrancy (enabled: boolean, type?: string): void {
-        this.lastVibrancy = { enabled, type }
+    setVibrancy (enabled: boolean, type?: string, userRequested?: boolean): void {
+        if (userRequested ?? true) {
+            this.lastVibrancy = { enabled, type }
+        }
         if (process.platform === 'win32') {
             if (parseFloat(os.release()) >= 10) {
-                glasstron.update(this.window, {
-                    windows: { blurType: enabled ? type === 'fluent' ? 'acrylic' : 'blurbehind' : null },
-                })
+                this.window.blurType = enabled ? type === 'fluent' ? 'acrylic' : 'blurbehind' : null
+                try {
+                    this.window.setBlur(enabled)
+                } catch (error) {
+                    console.error('Failed to set window blur', error)
+                }
             } else {
                 DwmEnableBlurBehindWindow(this.window, enabled)
             }
-        } else if (process.platform ==='linux') {
-            glasstron.update(this.window, {
-                linux: { requestBlur: enabled },
-            })
+        } else if (process.platform === 'linux') {
             this.window.setBackgroundColor(enabled ? '#00000000' : '#131d27')
+            this.window.setBlur(enabled)
         } else {
-            this.window.setVibrancy(enabled ? 'dark' : null as any) // electron issue 20269
+            this.window.setVibrancy(enabled ? macOSVibrancyType : null)
         }
     }
 
@@ -157,7 +176,7 @@ export class Window {
         this.window.focus()
     }
 
-    send (event: string, ...args): void {
+    send (event: string, ...args: any[]): void {
         if (!this.window) {
             return
         }
@@ -173,6 +192,10 @@ export class Window {
 
     isFocused (): boolean {
         return this.window.isFocused()
+    }
+
+    isVisible (): boolean {
+        return this.window.isVisible()
     }
 
     hide (): void {
@@ -210,8 +233,8 @@ export class Window {
         }
     }
 
-    handleSecondInstance (argv: string[], cwd: string): void {
-        this.send('host:second-instance', parseArgs(argv, cwd), cwd)
+    passCliArguments (argv: string[], cwd: string, secondInstance: boolean): void {
+        this.send('cli', parseArgs(argv, cwd), cwd, secondInstance)
     }
 
     private setupWindowManagement () {
@@ -224,7 +247,7 @@ export class Window {
             this.visible.next(false)
         })
 
-        let moveSubscription = new Observable<void>(observer => {
+        const moveSubscription = new Observable<void>(observer => {
             this.window.on('move', () => observer.next())
         }).pipe(debounceTime(250)).subscribe(() => {
             this.send('host:window-moved')
@@ -267,36 +290,17 @@ export class Window {
             this.send('host:window-focused')
         })
 
-        ipcMain.on('window-focus', event => {
+        ipcMain.on('ready', event => {
             if (!this.window || event.sender !== this.window.webContents) {
                 return
             }
-            this.window.focus()
-        })
-
-        ipcMain.on('window-maximize', event => {
-            if (!this.window || event.sender !== this.window.webContents) {
-                return
-            }
-            this.window.maximize()
-        })
-
-        ipcMain.on('window-unmaximize', event => {
-            if (!this.window || event.sender !== this.window.webContents) {
-                return
-            }
-            this.window.unmaximize()
-        })
-
-        ipcMain.on('window-toggle-maximize', event => {
-            if (!this.window || event.sender !== this.window.webContents) {
-                return
-            }
-            if (this.window.isMaximized()) {
-                this.window.unmaximize()
-            } else {
-                this.window.maximize()
-            }
+            this.window.webContents.send('start', {
+                config: this.configStore,
+                executable: app.getPath('exe'),
+                windowID: this.window.id,
+                isFirstWindow: this.window.id === 1,
+                userPluginsPath: this.application.userPluginsPath,
+            })
         })
 
         ipcMain.on('window-minimize', event => {
@@ -359,24 +363,21 @@ export class Window {
             this.disableVibrancyWhileDragging = value
         })
 
-        this.window.on('will-move', () => {
+        let moveEndedTimeout: any = null
+        const onBoundsChange = () => {
             if (!this.lastVibrancy?.enabled || !this.disableVibrancyWhileDragging) {
                 return
             }
-            let timeout: number|null = null
-            const oldVibrancy = this.lastVibrancy
-            this.setVibrancy(false)
-            const onMove = () => {
-                if (timeout) {
-                    clearTimeout(timeout)
-                }
-                timeout = setTimeout(() => {
-                    this.window.off('move', onMove)
-                    this.setVibrancy(oldVibrancy.enabled, oldVibrancy.type)
-                }, 500)
+            this.setVibrancy(false, undefined, false)
+            if (moveEndedTimeout) {
+                clearTimeout(moveEndedTimeout)
             }
-            this.window.on('move', onMove)
-        })
+            moveEndedTimeout = setTimeout(() => {
+                this.setVibrancy(this.lastVibrancy.enabled, this.lastVibrancy.type)
+            }, 50)
+        }
+        this.window.on('move', onBoundsChange)
+        this.window.on('resize', onBoundsChange)
     }
 
     private destroy () {
