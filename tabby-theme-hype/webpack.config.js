@@ -20,17 +20,22 @@ module.exports = {
     rules: [
       {
         test: /\.ts$/,
-        loader: 'awesome-typescript-loader',
-        options: {
-          configFileName: path.resolve(__dirname, 'tsconfig.json'),
-        }
+          use: {
+            loader: 'ts-loader',
+            options: {
+              configFile: path.resolve(__dirname, 'tsconfig.json'),
+              allowTsInNodeModules: true,
+            },
+          },
       },
-      { test: /\.scss$/, use: ['to-string-loader', 'css-loader', 'sass-loader'] },
+      { test: /\.scss$/, 
+        use: ['@tabby-gang/to-string-loader', 'css-loader', 'sass-loader']
+      },
     ]
   },
   externals: [
     /^@angular/,
     /^@ng-bootstrap/,
-    /^terminus-/,
+    /^tabby-/,
   ]
 }
