@@ -98,9 +98,9 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     enablePassthrough = true
 
     /**
-     * Enables receiving dynamic window/tab title provided by the shell
+     * Disables display of dynamic window/tab title provided by the shell
      */
-    enableDynamicTitle = true
+    disableDynamicTitle = false
 
     alternateScreenActive = false
 
@@ -127,10 +127,15 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     private termContainerSubscriptions = new SubscriptionContainer()
     private allFocusModeSubscription: Subscription|null = null
     private sessionHandlers = new SubscriptionContainer()
-    private sessionSupportsBracketedPaste = false
     private spinner = new Spinner({
         stream: {
-            write: x => this.writeRaw(x),
+            write: x => {
+                try {
+                    this.writeRaw(x)
+                } catch {
+                    this.spinner.stop()
+                }
+            },
         },
     })
     private spinnerActive = false
@@ -196,15 +201,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                         this.frontend.clearSelection()
                         this.notifications.notice('Copied')
                     } else {
-                        if (this.parent && this.parent instanceof SplitTabComponent && this.parent._allFocusMode) {
-                            for (const tab of this.parent.getAllTabs()) {
-                                if (tab instanceof BaseTerminalTabComponent) {
-                                    tab.sendInput('\x03')
-                                }
-                            }
-                        } else {
-                            this.sendInput('\x03')
-                        }
+                        this.forEachFocusedTerminalPane(tab => tab.sendInput('\x03'))
                     }
                     break
                 case 'copy':
@@ -213,46 +210,54 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                     this.notifications.notice('Copied')
                     break
                 case 'paste':
-                    this.paste()
+                    this.forEachFocusedTerminalPane(tab => tab.paste())
                     break
                 case 'select-all':
                     this.frontend?.selectAll()
                     break
                 case 'clear':
-                    this.frontend?.clear()
+                    this.forEachFocusedTerminalPane(tab => tab.frontend?.clear())
                     break
                 case 'zoom-in':
-                    this.zoomIn()
+                    this.forEachFocusedTerminalPane(tab => tab.zoomIn())
                     break
                 case 'zoom-out':
-                    this.zoomOut()
+                    this.forEachFocusedTerminalPane(tab => tab.zoomOut())
                     break
                 case 'reset-zoom':
-                    this.resetZoom()
+                    this.forEachFocusedTerminalPane(tab => tab.resetZoom())
                     break
                 case 'previous-word':
-                    this.sendInput({
-                        [Platform.Windows]: '\x1b[1;5D',
-                        [Platform.macOS]: '\x1bb',
-                        [Platform.Linux]: '\x1bb',
-                    }[this.hostApp.platform])
+                    this.forEachFocusedTerminalPane(tab => {
+                        tab.sendInput({
+                            [Platform.Windows]: '\x1b[1;5D',
+                            [Platform.macOS]: '\x1bb',
+                            [Platform.Linux]: '\x1bb',
+                        }[this.hostApp.platform])
+                    })
                     break
                 case 'next-word':
-                    this.sendInput({
-                        [Platform.Windows]: '\x1b[1;5C',
-                        [Platform.macOS]: '\x1bf',
-                        [Platform.Linux]: '\x1bf',
-                    }[this.hostApp.platform])
+                    this.forEachFocusedTerminalPane(tab => {
+                        tab.sendInput({
+                            [Platform.Windows]: '\x1b[1;5C',
+                            [Platform.macOS]: '\x1bf',
+                            [Platform.Linux]: '\x1bf',
+                        }[this.hostApp.platform])
+                    })
                     break
                 case 'delete-previous-word':
-                    this.sendInput('\x1b\x7f')
+                    this.forEachFocusedTerminalPane(tab => {
+                        tab.sendInput('\x1b\x7f')
+                    })
                     break
                 case 'delete-next-word':
-                    this.sendInput({
-                        [Platform.Windows]: '\x1bd\x1b[3;5~',
-                        [Platform.macOS]: '\x1bd',
-                        [Platform.Linux]: '\x1bd',
-                    }[this.hostApp.platform])
+                    this.forEachFocusedTerminalPane(tab => {
+                        tab.sendInput({
+                            [Platform.Windows]: '\x1bd\x1b[3;5~',
+                            [Platform.macOS]: '\x1bd',
+                            [Platform.Linux]: '\x1bd',
+                        }[this.hostApp.platform])
+                    })
                     break
                 case 'search':
                     this.showSearchPanel = true
@@ -315,12 +320,12 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
 
         setImmediate(async () => {
             if (this.hasFocus) {
-                await this.frontend!.attach(this.content.nativeElement)
-                this.frontend!.configure()
+                await this.frontend?.attach(this.content.nativeElement)
+                this.frontend?.configure()
             } else {
                 this.focused$.pipe(first()).subscribe(async () => {
-                    await this.frontend!.attach(this.content.nativeElement)
-                    this.frontend!.configure()
+                    await this.frontend?.attach(this.content.nativeElement)
+                    this.frontend?.configure()
                 })
             }
         })
@@ -412,25 +417,19 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             }
         }
 
-        if (data.includes('\x1b[?2004h')) {
-            this.sessionSupportsBracketedPaste = true
-        }
-        if (data.includes('\x1b[?2004l')) {
-            this.sessionSupportsBracketedPaste = false
-        }
-
         this.frontend.write(data)
     }
 
     async paste (): Promise<void> {
         let data = this.platform.readClipboard()
-        if (this.config.store.terminal.bracketedPaste && this.sessionSupportsBracketedPaste) {
-            data = `\x1b[200~${data}\x1b[201~`
-        }
         if (this.hostApp.platform === Platform.Windows) {
             data = data.replaceAll('\r\n', '\r')
         } else {
             data = data.replaceAll('\n', '\r')
+        }
+
+        if (data.endsWith('\n')) {
+            data = data.substring(0, data.length - 1)
         }
 
         if (!this.alternateScreenActive) {
@@ -445,12 +444,17 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                         message: `Paste multiple lines?`,
                         buttons,
                         defaultId: 0,
+                        cancelId: 1,
                     }
                 )).response
                 if (result === 1) {
                     return
                 }
             }
+        }
+
+        if (this.config.store.terminal.bracketedPaste && this.frontend?.supportsBracketedPaste()) {
+            data = `\x1b[200~${data}\x1b[201~`
         }
         this.sendInput(data)
     }
@@ -585,7 +589,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         }
 
         this.termContainerSubscriptions.subscribe(this.frontend.title$, title => this.zone.run(() => {
-            if (this.enableDynamicTitle) {
+            if (!this.disableDynamicTitle) {
                 this.setTitle(title)
             }
         }))
@@ -593,7 +597,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         this.termContainerSubscriptions.subscribe(this.focused$, () => this.frontend && (this.frontend.enableResizing = true))
         this.termContainerSubscriptions.subscribe(this.blurred$, () => this.frontend && (this.frontend.enableResizing = false))
 
-        this.termContainerSubscriptions.subscribe(this.frontend.mouseEvent$, async event => {
+        this.termContainerSubscriptions.subscribe(this.frontend.mouseEvent$, event => {
             if (event.type === 'mousedown') {
                 if (event.which === 1) {
                     this.cancelFocusAllPanes()
@@ -702,6 +706,11 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         this.attachSessionHandler(this.session.destroyed$, () => {
             this.setSession(null)
         })
+
+        this.attachSessionHandler(this.session.oscProcessor.copyRequested$, content => {
+            this.platform.setClipboard({ text: content })
+            this.notifications.notice('Copied')
+        })
     }
 
     protected detachSessionHandlers (): void {
@@ -716,7 +725,9 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             this.spinner.text = text
         }
         this.spinner.setSpinnerString(6)
-        this.spinner.start()
+        this.zone.runOutsideAngular(() => {
+            this.spinner.start()
+        })
         this.spinnerActive = true
     }
 
@@ -734,6 +745,18 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         work()
         if (wasActive) {
             this.startSpinner()
+        }
+    }
+
+    protected forEachFocusedTerminalPane (cb: (tab: BaseTerminalTabComponent) => void): void {
+        if (this.parent && this.parent instanceof SplitTabComponent && this.parent._allFocusMode) {
+            for (const tab of this.parent.getAllTabs()) {
+                if (tab instanceof BaseTerminalTabComponent) {
+                    cb(tab)
+                }
+            }
+        } else {
+            cb(this)
         }
     }
 }

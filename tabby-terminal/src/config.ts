@@ -12,7 +12,7 @@ export class TerminalConfigProvider extends ConfigProvider {
             fallbackFont: null,
             linePadding: 0,
             bell: 'off',
-            bracketedPaste: false,
+            bracketedPaste: true,
             background: 'theme',
             ligatures: false,
             cursor: 'block',
@@ -32,6 +32,7 @@ export class TerminalConfigProvider extends ConfigProvider {
                 background: 'rgba(38, 50, 56, 1)',
                 selection: null,
                 cursor: '#FFCC00',
+                cursorAccent: null,
                 colors: [
                     '#000000',
                     '#D62341',
@@ -120,6 +121,7 @@ export class TerminalConfigProvider extends ConfigProvider {
                 ],
                 paste: [
                     'Ctrl-Shift-V',
+                    'Shift-Insert',
                 ],
                 'select-all': ['Ctrl-Shift-A'],
                 clear: [],
@@ -159,6 +161,7 @@ export class TerminalConfigProvider extends ConfigProvider {
                 ],
                 paste: [
                     'Ctrl-Shift-V',
+                    'Shift-Insert',
                 ],
                 'select-all': ['Ctrl-Shift-A'],
                 clear: [],

@@ -12,9 +12,9 @@ export interface Bounds {
 
 @Injectable({ providedIn: 'root' })
 export class ElectronHostWindow extends HostWindowService {
-    get isFullscreen (): boolean { return this._isFullScreen}
+    get isFullscreen (): boolean { return this._isFullscreen }
 
-    private _isFullScreen = false
+    private _isFullscreen = false
 
     constructor (
         zone: NgZone,
@@ -23,28 +23,26 @@ export class ElectronHostWindow extends HostWindowService {
     ) {
         super()
         electron.ipcRenderer.on('host:window-enter-full-screen', () => zone.run(() => {
-            this._isFullScreen = true
+            this._isFullscreen = true
         }))
 
         electron.ipcRenderer.on('host:window-leave-full-screen', () => zone.run(() => {
-            this._isFullScreen = false
+            this._isFullscreen = false
         }))
 
-        electron.ipcRenderer.on('host:window-shown', () => {
-            zone.run(() => this.windowShown.next())
-        })
+        electron.ipcRenderer.on('host:window-shown', () => zone.run(() => this.windowShown.next()))
 
-        electron.ipcRenderer.on('host:window-close-request', () => {
-            zone.run(() => this.windowCloseRequest.next())
-        })
+        electron.ipcRenderer.on('host:window-close-request', () => zone.run(() => {
+            this.windowCloseRequest.next()
+        }))
 
-        electron.ipcRenderer.on('host:window-moved', () => {
-            zone.run(() => this.windowMoved.next())
-        })
+        electron.ipcRenderer.on('host:window-moved', () => zone.run(() => {
+            this.windowMoved.next()
+        }))
 
-        electron.ipcRenderer.on('host:window-focused', () => {
-            zone.run(() => this.windowFocused.next())
-        })
+        electron.ipcRenderer.on('host:window-focused', () => zone.run(() => {
+            this.windowFocused.next()
+        }))
     }
 
     getWindow (): BrowserWindow {
@@ -64,7 +62,7 @@ export class ElectronHostWindow extends HostWindowService {
     }
 
     toggleFullscreen (): void {
-        this.getWindow().setFullScreen(!this._isFullScreen)
+        this.getWindow().setFullScreen(!this._isFullscreen)
     }
 
     minimize (): void {
@@ -97,6 +95,18 @@ export class ElectronHostWindow extends HostWindowService {
 
     setTouchBar (touchBar: TouchBar): void {
         this.getWindow().setTouchBar(touchBar)
+    }
+
+    setTrafficLightPosition (x: number, y: number): void {
+        this.electron.ipcRenderer.send('window-set-traffic-light-position', x, y)
+    }
+
+    setOpacity (opacity: number): void {
+        this.electron.ipcRenderer.send('window-set-opacity', opacity)
+    }
+
+    setProgressBar (value: number): void {
+        this.electron.ipcRenderer.send('window-set-progress-bar', value)
     }
 
     bringToFront (): void {

@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core'
 import { PlatformService, LogService, UpdaterService, DockingService, HostAppService, ThemesService, Platform, AppService, ConfigService, WIN_BUILD_FLUENT_BG_SUPPORTED, isWindowsBuild, HostWindowService, HotkeyProvider, ConfigProvider, FileProvider } from 'tabby-core'
 import { TerminalColorSchemeProvider } from 'tabby-terminal'
+import { SFTPContextMenuItemProvider } from 'tabby-ssh'
 
 import { HyperColorSchemes } from './colorSchemes'
 import { ElectronPlatformService } from './services/platform.service'
@@ -14,11 +15,12 @@ import { ElectronHostAppService } from './services/hostApp.service'
 import { ElectronService } from './services/electron.service'
 import { ElectronHotkeyProvider } from './hotkeys'
 import { ElectronConfigProvider } from './config'
+import { EditSFTPContextMenu } from './sftpContextMenu'
 
 @NgModule({
     providers: [
         { provide: TerminalColorSchemeProvider, useClass: HyperColorSchemes, multi: true },
-        { provide: PlatformService, useClass: ElectronPlatformService },
+        { provide: PlatformService, useExisting: ElectronPlatformService },
         { provide: HostWindowService, useExisting: ElectronHostWindow },
         { provide: HostAppService, useExisting: ElectronHostAppService },
         { provide: LogService, useClass: ElectronLogService },
@@ -27,6 +29,7 @@ import { ElectronConfigProvider } from './config'
         { provide: HotkeyProvider, useClass: ElectronHotkeyProvider, multi: true },
         { provide: ConfigProvider, useClass: ElectronConfigProvider, multi: true },
         { provide: FileProvider, useClass: ElectronFileProvider, multi: true },
+        { provide: SFTPContextMenuItemProvider, useClass: EditSFTPContextMenu, multi: true },
     ],
 })
 export default class ElectronModule {
@@ -56,10 +59,10 @@ export default class ElectronModule {
 
         themeService.themeChanged$.subscribe(theme => {
             if (hostApp.platform === Platform.macOS) {
-                hostWindow.getWindow().setTrafficLightPosition({
-                    x: theme.macOSWindowButtonsInsetX ?? 14,
-                    y: theme.macOSWindowButtonsInsetY ?? 11,
-                })
+                hostWindow.setTrafficLightPosition(
+                    theme.macOSWindowButtonsInsetX ?? 14,
+                    theme.macOSWindowButtonsInsetY ?? 11,
+                )
             }
         })
 
@@ -70,9 +73,9 @@ export default class ElectronModule {
                     return
                 }
                 if (progress !== null) {
-                    hostWindow.getWindow().setProgressBar(progress / 100.0, { mode: 'normal' })
+                    hostWindow.setProgressBar(progress / 100.0)
                 } else {
-                    hostWindow.getWindow().setProgressBar(-1, { mode: 'none' })
+                    hostWindow.setProgressBar(-1)
                 }
                 lastProgress = progress
             })
@@ -113,7 +116,7 @@ export default class ElectronModule {
         document.body.classList.toggle('vibrant', this.config.store.appearance.vibrancy)
         this.electron.ipcRenderer.send('window-set-vibrancy', this.config.store.appearance.vibrancy, vibrancyType)
 
-        this.hostWindow.getWindow().setOpacity(this.config.store.appearance.opacity)
+        this.hostWindow.setOpacity(this.config.store.appearance.opacity)
     }
 }
 

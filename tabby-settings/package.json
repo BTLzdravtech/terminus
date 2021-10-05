@@ -1,6 +1,6 @@
 {
   "name": "tabby-settings",
-  "version": "1.0.149-nightly.4",
+  "version": "1.0.156",
   "description": "Tabby terminal settings page",
   "keywords": [
     "tabby-builtin-plugin"
@@ -17,10 +17,8 @@
   "author": "Eugene Pankov",
   "license": "MIT",
   "devDependencies": {
-    "@types/deep-equal": "1.0.1",
-    "marked": "^2.1.3",
-    "ngx-infinite-scroll": "^10.0.1",
-    "utils-decorators": "^1.8.0"
+    "marked": "^3.0.2",
+    "ngx-infinite-scroll": "^10.0.1"
   },
   "peerDependencies": {
     "@angular/animations": "^9.1.9",

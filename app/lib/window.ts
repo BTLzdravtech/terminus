@@ -1,7 +1,7 @@
 import * as glasstron from 'glasstron'
 
 import { Subject, Observable, debounceTime } from 'rxjs'
-import { BrowserWindow, app, ipcMain, Rectangle, Menu, screen, BrowserWindowConstructorOptions } from 'electron'
+import { BrowserWindow, app, ipcMain, Rectangle, Menu, screen, BrowserWindowConstructorOptions, TouchBar, nativeImage } from 'electron'
 import ElectronConfig = require('electron-config')
 import * as os from 'os'
 import * as path from 'path'
@@ -28,6 +28,8 @@ abstract class GlasstronWindow extends BrowserWindow {
 
 const macOSVibrancyType = process.platform === 'darwin' ? compareVersions.compare(macOSRelease().version, '10.14', '>=') ? 'fullscreen-ui' : 'dark' : null
 
+const activityIcon = nativeImage.createFromPath(`${app.getAppPath()}/assets/activity.png`)
+
 export class Window {
     ready: Promise<void>
     private visible = new Subject<boolean>()
@@ -39,6 +41,7 @@ export class Window {
     private lastVibrancy: { enabled: boolean, type?: string } | null = null
     private disableVibrancyWhileDragging = false
     private configStore: any
+    private touchBarControl: any
 
     get visible$ (): Observable<boolean> { return this.visible }
     get closed$ (): Observable<void> { return this.closed }
@@ -113,6 +116,7 @@ export class Window {
                 }
                 this.window.focus()
                 this.window.moveTop()
+                application.focus()
             }
         })
 
@@ -127,7 +131,15 @@ export class Window {
         this.window.webContents.setVisualZoomLevelLimits(1, 1)
         this.window.webContents.setZoomFactor(1)
 
-        if (process.platform !== 'darwin') {
+        if (process.platform === 'darwin') {
+            this.touchBarControl = new TouchBar.TouchBarSegmentedControl({
+                segments: [],
+                change: index => this.send('touchbar-selection', index),
+            })
+            this.window.setTouchBar(new TouchBar({
+                items: [this.touchBarControl],
+            }))
+        } else {
             this.window.setMenu(null)
         }
 
@@ -357,6 +369,14 @@ export class Window {
             this.window.close()
         })
 
+        ipcMain.on('window-set-touch-bar', (_event, segments, selectedIndex) => {
+            this.touchBarControl.segments = segments.map(s => ({
+                label: s.label,
+                icon: s.hasActivity ? activityIcon : undefined,
+            }))
+            this.touchBarControl.selectedIndex = selectedIndex
+        })
+
         this.window.webContents.on('new-window', event => event.preventDefault())
 
         ipcMain.on('window-set-disable-vibrancy-while-dragging', (_event, value) => {
@@ -378,6 +398,18 @@ export class Window {
         }
         this.window.on('move', onBoundsChange)
         this.window.on('resize', onBoundsChange)
+
+        ipcMain.on('window-set-traffic-light-position', (_event, x, y) => {
+            this.window.setTrafficLightPosition({ x, y })
+        })
+
+        ipcMain.on('window-set-opacity', (_event, opacity) => {
+            this.window.setOpacity(opacity)
+        })
+
+        ipcMain.on('window-set-progress-bar', (_event, value) => {
+            this.window.setProgressBar(value, { mode: value < 0 ? 'none' : 'normal' })
+        })
     }
 
     private destroy () {
