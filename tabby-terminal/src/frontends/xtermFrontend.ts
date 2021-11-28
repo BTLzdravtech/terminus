@@ -1,6 +1,7 @@
 import { Injector } from '@angular/core'
 import { ConfigService, getCSSFontFamily, HostAppService, HotkeysService, Platform, PlatformService } from 'tabby-core'
 import { Frontend, SearchOptions } from './frontend'
+import { takeUntil } from 'rxjs'
 import { Terminal, ITheme } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import { LigaturesAddon } from 'xterm-addon-ligatures'
@@ -118,20 +119,8 @@ export class XTermFrontend extends Frontend {
         this.resizeHandler = () => {
             try {
                 if (this.xterm.element && getComputedStyle(this.xterm.element).getPropertyValue('height') !== 'auto') {
-                    const t = window.getComputedStyle(this.xterm.element.parentElement!)
-                    const r = parseInt(t.getPropertyValue('height'))
-                    const n = Math.max(0, parseInt(t.getPropertyValue('width')))
-                    const o = window.getComputedStyle(this.xterm.element)
-                    const i = r - (parseInt(o.getPropertyValue('padding-top')) + parseInt(o.getPropertyValue('padding-bottom')))
-                    const l = n - (parseInt(o.getPropertyValue('padding-right')) + parseInt(o.getPropertyValue('padding-left'))) - this.xtermCore.viewport.scrollBarWidth
-                    const actualCellWidth = this.xtermCore._renderService.dimensions.actualCellWidth || 9
-                    const actualCellHeight = this.xtermCore._renderService.dimensions.actualCellHeight || 17
-                    const cols = Math.floor(l / actualCellWidth)
-                    const rows = Math.floor(i / actualCellHeight)
-
-                    if (!isNaN(cols) && !isNaN(rows)) {
-                        this.xterm.resize(cols, rows)
-                    }
+                    this.fitAddon.fit()
+                    this.xtermCore.viewport._refresh()
                 }
             } catch (e) {
                 // tends to throw when element wasn't shown yet
@@ -163,6 +152,11 @@ export class XTermFrontend extends Frontend {
         if (this.enableWebGL) {
             this.webGLAddon = new WebglAddon()
             this.xterm.loadAddon(this.webGLAddon)
+            this.platformService.displayMetricsChanged$.pipe(
+                takeUntil(this.destroyed$),
+            ).subscribe(() => {
+                this.webGLAddon?.clearTextureAtlas()
+            })
         }
 
         this.ready.next()
@@ -269,15 +263,15 @@ export class XTermFrontend extends Frontend {
             }
         })
 
-        this.xterm.setOption('fontFamily', getCSSFontFamily(config))
-        this.xterm.setOption('bellStyle', config.terminal.bell)
-        this.xterm.setOption('cursorStyle', {
+        this.xterm.options.fontFamily = getCSSFontFamily(config)
+        this.xterm.options.bellStyle = config.terminal.bell
+        this.xterm.options.cursorStyle = {
             beam: 'bar',
-        }[config.terminal.cursor] || config.terminal.cursor)
-        this.xterm.setOption('cursorBlink', config.terminal.cursorBlink)
-        this.xterm.setOption('macOptionIsMeta', config.terminal.altIsMeta)
-        this.xterm.setOption('scrollback', config.terminal.scrollbackLines)
-        this.xterm.setOption('wordSeparator', config.terminal.wordSeparator)
+        }[config.terminal.cursor] || config.terminal.cursor
+        this.xterm.options.cursorBlink = config.terminal.cursorBlink
+        this.xterm.options.macOptionIsMeta = config.terminal.altIsMeta
+        this.xterm.options.scrollback = config.terminal.scrollbackLines
+        this.xterm.options.wordSeparator = config.terminal.wordSeparator
         this.configuredFontSize = config.terminal.fontSize
         this.configuredLinePadding = config.terminal.linePadding
         this.setFontSize()
@@ -297,7 +291,7 @@ export class XTermFrontend extends Frontend {
         }
 
         if (this.xtermCore._colorManager && !deepEqual(this.configuredTheme, theme)) {
-            this.xterm.setOption('theme', theme)
+            this.xterm.options.theme = theme
             this.configuredTheme = theme
         }
 
@@ -321,7 +315,11 @@ export class XTermFrontend extends Frontend {
     }
 
     saveState (): any {
-        return this.serializeAddon.serialize(1000)
+        return this.serializeAddon.serialize({
+            excludeAltBuffer: true,
+            excludeModes: true,
+            scrollback: 1000,
+        })
     }
 
     restoreState (state: string): void {
@@ -334,9 +332,9 @@ export class XTermFrontend extends Frontend {
 
     private setFontSize () {
         const scale = Math.pow(1.1, this.zoom)
-        this.xterm.setOption('fontSize', this.configuredFontSize * scale)
+        this.xterm.options.fontSize = this.configuredFontSize * scale
         // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
-        this.xterm.setOption('lineHeight', (this.configuredFontSize + this.configuredLinePadding * 2) / this.configuredFontSize)
+        this.xterm.options.lineHeight = (this.configuredFontSize + this.configuredLinePadding * 2) / this.configuredFontSize * scale
         this.resizeHandler()
     }
 

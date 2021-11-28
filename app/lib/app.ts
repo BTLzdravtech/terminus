@@ -54,7 +54,11 @@ export class Application {
         })
 
         ;(promiseIpc as any).on('get-default-mac-shell', async () => {
-            return (await exec(`/usr/bin/dscl . -read /Users/${process.env.LOGNAME} UserShell`))[0].toString().split(' ')[1].trim()
+            try {
+                return (await exec(`/usr/bin/dscl . -read /Users/${process.env.LOGNAME} UserShell`))[0].toString().split(' ')[1].trim()
+            } catch {
+                return '/bin/bash'
+            }
         })
 
         const configData = loadConfig()
@@ -257,7 +261,6 @@ export class Application {
             {
                 label: 'View',
                 submenu: [
-                    { role: 'reload' },
                     { role: 'toggleDevTools' },
                     { type: 'separator' },
                     { role: 'togglefullscreen' },
@@ -284,6 +287,10 @@ export class Application {
                 ],
             },
         ]
+
+        if (process.env.TABBY_DEV) {
+            template[2].submenu['unshift']({ role: 'reload' })
+        }
 
         Menu.setApplicationMenu(Menu.buildFromTemplate(template))
     }

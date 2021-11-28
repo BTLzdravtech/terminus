@@ -6,7 +6,6 @@ import { SSHTabComponent } from './components/sshTab.component'
 import { PasswordStorageService } from './services/passwordStorage.service'
 import { ALGORITHM_BLACKLIST, SSHAlgorithmType, SSHProfile } from './api'
 
-
 @Injectable({ providedIn: 'root' })
 export class SSHProfilesService extends ProfileProvider<SSHProfile> {
     id = 'ssh'
@@ -74,7 +73,7 @@ export class SSHProfilesService extends ProfileProvider<SSHProfile> {
         }]
     }
 
-    async getNewTabParameters (profile: PartialProfile<SSHProfile>): Promise<NewTabParameters<SSHTabComponent>> {
+    async getNewTabParameters (profile: SSHProfile): Promise<NewTabParameters<SSHTabComponent>> {
         return {
             type: SSHTabComponent,
             inputs: { profile },
@@ -94,7 +93,7 @@ export class SSHProfilesService extends ProfileProvider<SSHProfile> {
     }
 
     quickConnect (query: string): PartialProfile<SSHProfile> {
-        let user = 'root'
+        let user: string|undefined = undefined
         let host = query
         let port = 22
         if (host.includes('@')) {

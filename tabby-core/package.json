@@ -1,6 +1,6 @@
 {
   "name": "tabby-core",
-  "version": "1.0.156",
+  "version": "1.0.163",
   "description": "Tabby core",
   "keywords": [
     "tabby-builtin-plugin"
@@ -17,7 +17,6 @@
   "author": "Eugene Pankov",
   "license": "MIT",
   "devDependencies": {
-    "@types/js-yaml": "^4.0.0",
     "bootstrap": "^4.1.3",
     "deepmerge": "^4.1.1",
     "electron-updater": "^4.0.6",

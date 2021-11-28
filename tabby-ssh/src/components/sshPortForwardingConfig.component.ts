@@ -26,6 +26,7 @@ export class SSHPortForwardingConfigComponent {
             port: 8000,
             targetAddress: '127.0.0.1',
             targetPort: 80,
+            description: '',
         }
     }
 
@@ -40,5 +41,6 @@ export class SSHPortForwardingConfigComponent {
 
     remove (fw: ForwardedPortConfig) {
         this.forwardRemoved.emit(fw)
+        this.newForward = fw
     }
 }

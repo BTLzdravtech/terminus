@@ -3,7 +3,7 @@ import { promisify } from 'util'
 import { Injectable, NgZone } from '@angular/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { AsyncSubject, Subject, Observable } from 'rxjs'
-import { wrapPromise } from '../utils'
+import { wrapPromise, serializeFunction } from '../utils'
 import { UnlockVaultModalComponent } from '../components/unlockVaultModal.component'
 import { NotificationsService } from './notifications.service'
 import { SelectorService } from './selector.service'
@@ -17,7 +17,7 @@ const CRYPT_ALG = 'aes-256-cbc'
 const CRYPT_KEY_LENGTH = 256 / 8
 const CRYPT_IV_LENGTH = 128 / 8
 
-interface StoredVault {
+export interface StoredVault {
     version: number
     contents: string
     keySalt: string
@@ -114,7 +114,9 @@ export class VaultService {
         private zone: NgZone,
         private notifications: NotificationsService,
         private ngbModal: NgbModal,
-    ) { }
+    ) {
+        this.getPassphrase = serializeFunction(this.getPassphrase.bind(this))
+    }
 
     async setEnabled (enabled: boolean, passphrase?: string): Promise<void> {
         if (enabled) {

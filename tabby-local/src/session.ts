@@ -81,6 +81,35 @@ export class PTYProxy {
     }
 }
 
+function mergeEnv (...envs) {
+    const result = {}
+    const keyMap = {}
+    for (const env of envs) {
+        for (const [key, value] of Object.entries(env)) {
+            // const lookup = process.platform === 'win32' ? key.toLowerCase() : key
+            const lookup = key.toLowerCase()
+            keyMap[lookup] ??= key
+            result[keyMap[lookup]] = value
+        }
+    }
+    return result
+}
+
+function substituteEnv (env: Record<string, string>) {
+    env = { ...env }
+    const pattern = process.platform === 'win32' ? /%(\w+)%/g : /\$(\w+)\b/g
+    for (const [key, value] of Object.entries(env)) {
+        env[key] = value.replace(pattern, function (substring, p1) {
+            if (process.platform === 'win32') {
+                return Object.entries(process.env).find(x => x[0].toLowerCase() === p1.toLowerCase())?.[1] ?? ''
+            } else {
+                return process.env[p1] ?? ''
+            }
+        })
+    }
+    return env
+}
+
 /** @hidden */
 export class Session extends BaseSession {
     private pty: PTYProxy|null = null
@@ -108,22 +137,18 @@ export class Session extends BaseSession {
         }
 
         if (!pty) {
-            const env = {
-                ...process.env,
-                TERM: 'xterm-256color',
-                TERM_PROGRAM: 'Tabby',
-                ...options.env,
-                ...this.config.store.terminal.environment || {},
-            }
+            let env = mergeEnv(
+                process.env,
+                {
+                    TERM: 'xterm-256color',
+                    TERM_PROGRAM: 'Tabby',
+                },
+                substituteEnv(options.env ?? {}),
+                this.config.store.terminal.environment || {},
+            )
 
             if (this.hostApp.platform === Platform.Windows && this.config.store.terminal.setComSpec) {
-                for (const k of Object.keys(env)) {
-                    if (k.toUpperCase() === 'COMSPEC') {
-                        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-                        delete env[k]
-                    }
-                }
-                env.COMSPEC = this.bootstrapData.executable
+                env = mergeEnv(env, { COMSPEC: this.bootstrapData.executable })
             }
 
             delete env['']

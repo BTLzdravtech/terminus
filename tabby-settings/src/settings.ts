@@ -5,7 +5,6 @@ import { WindowSettingsTabComponent } from './components/windowSettingsTab.compo
 import { VaultSettingsTabComponent } from './components/vaultSettingsTab.component'
 import { ConfigSyncSettingsTabComponent } from './components/configSyncSettingsTab.component'
 import { ProfilesSettingsTabComponent } from './components/profilesSettingsTab.component'
-import { ConfigSyncService } from './services/configSync.service'
 
 /** @hidden */
 @Injectable()
@@ -51,7 +50,8 @@ export class VaultSettingsTabProvider extends SettingsTabProvider {
 export class ProfilesSettingsTabProvider extends SettingsTabProvider {
     id = 'profiles'
     icon = 'window-restore'
-    title = 'Profiles'
+    title = 'Profiles & connections'
+    prioritized = true
 
     getComponentType (): any {
         return ProfilesSettingsTabComponent
@@ -65,14 +65,7 @@ export class ConfigSyncSettingsTabProvider extends SettingsTabProvider {
     icon = 'cloud'
     title = 'Config sync'
 
-    constructor (
-        private configSync: ConfigSyncService,
-    ) { super() }
-
     getComponentType (): any {
-        if (!this.configSync.isAvailable()) {
-            return null
-        }
         return ConfigSyncSettingsTabComponent
     }
 }
