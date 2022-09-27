@@ -2143,10 +2143,10 @@ node-abi@^2.20.0, node-abi@^2.21.0, node-abi@^2.7.0:
   dependencies:
     semver "^5.4.1"
 
-node-abi@^3.3.0:
-  version "3.3.0"
-  resolved "https://registry.yarnpkg.com/node-abi/-/node-abi-3.3.0.tgz#62cc0d9c7976bd415889aba622ab8f5562082028"
-  integrity sha512-/+2sCVPXmj07GY/l0ggRr7+trqzX7F9d4QVfSArqIVYmRzc/LkXKr5FlRO6U8uZ/gVVclDDaBxBNITj1z1Z/Zw==
+node-abi@^3.25.0:
+  version "3.25.0"
+  resolved "https://registry.yarnpkg.com/node-abi/-/node-abi-3.25.0.tgz#ca57dd23ae67679ce152b6c45cae2c57ed04faff"
+  integrity sha512-p+0xx5ruIQ+8X57CRIMxbTZRT7tU0Tjn2C/aAK68AEMrbGsCo6IjnDdPNhEyyjWCT4bRtzomXchYd3sSgk3BJQ==
   dependencies:
     semver "^7.3.5"
 
