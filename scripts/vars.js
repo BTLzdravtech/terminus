@@ -26,7 +26,6 @@ exports.builtinPlugins = [
     'tabby-local',
     'tabby-plugin-manager',
     'tabby-linkifier',
-    'tabby-theme-hype',
 ]
 
 exports.packagesWithDocs = [
