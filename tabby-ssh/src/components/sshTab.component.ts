@@ -1,14 +1,16 @@
+import { marker as _ } from '@biesbjerg/ngx-translate-extract-marker'
 import colors from 'ansi-colors'
 import { Component, Injector, HostListener } from '@angular/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { first } from 'rxjs'
-import { PartialProfile, Platform, ProfilesService, RecoveryToken } from 'tabby-core'
+import { GetRecoveryTokenOptions, Platform, ProfilesService, RecoveryToken } from 'tabby-core'
 import { BaseTerminalTabComponent } from 'tabby-terminal'
 import { SSHService } from '../services/ssh.service'
 import { KeyboardInteractivePrompt, SSHSession } from '../session/ssh'
 import { SSHPortForwardingModalComponent } from './sshPortForwardingModal.component'
 import { SSHProfile } from '../api'
-
+import { SSHShellSession } from '../session/shell'
+import { SSHMultiplexerService } from '../services/sshMultiplexer.service'
 
 /** @hidden */
 @Component({
@@ -20,12 +22,12 @@ import { SSHProfile } from '../api'
 export class SSHTabComponent extends BaseTerminalTabComponent {
     Platform = Platform
     profile?: SSHProfile
-    session: SSHSession|null = null
+    sshSession: SSHSession|null = null
+    session: SSHShellSession|null = null
     sftpPanelVisible = false
     sftpPath = '/'
     enableToolbar = true
     activeKIPrompt: KeyboardInteractivePrompt|null = null
-    private sessionStack: SSHSession[] = []
     private recentInputs = ''
     private reconnectOffered = false
 
@@ -34,6 +36,7 @@ export class SSHTabComponent extends BaseTerminalTabComponent {
         public ssh: SSHService,
         private ngbModal: NgbModal,
         private profilesService: ProfilesService,
+        private sshMultiplexer: SSHMultiplexerService,
     ) {
         super(injector)
         this.sessionChanged$.subscribe(() => {
@@ -63,8 +66,8 @@ export class SSHTabComponent extends BaseTerminalTabComponent {
                     this.reconnect()
                     break
                 case 'launch-winscp':
-                    if (this.session) {
-                        this.ssh.launchWinSCP(this.session)
+                    if (this.sshSession) {
+                        this.ssh.launchWinSCP(this.sshSession)
                     }
                     break
             }
@@ -81,56 +84,51 @@ export class SSHTabComponent extends BaseTerminalTabComponent {
         super.ngOnInit()
     }
 
-    async setupOneSession (session: SSHSession, interactive: boolean): Promise<void> {
-        if (session.profile.options.jumpHost) {
-            const jumpConnection: PartialProfile<SSHProfile>|null = this.config.store.profiles.find(x => x.id === session.profile.options.jumpHost)
+    async setupOneSession (injector: Injector, profile: SSHProfile, multiplex = true): Promise<SSHSession> {
+        let session = await this.sshMultiplexer.getSession(profile)
+        if (!multiplex || !session || !profile.options.reuseSession) {
+            session = new SSHSession(injector, profile)
 
-            if (!jumpConnection) {
-                throw new Error(`${session.profile.options.host}: jump host "${session.profile.options.jumpHost}" not found in your config`)
-            }
+            if (profile.options.jumpHost) {
+                const jumpConnection = (await this.profilesService.getProfiles()).find(x => x.id === profile.options.jumpHost)
 
-            const jumpSession = new SSHSession(
-                this.injector,
-                this.profilesService.getConfigProxyForProfile(jumpConnection)
-            )
-
-            await this.setupOneSession(jumpSession, false)
-
-            this.attachSessionHandler(jumpSession.destroyed$, () => {
-                if (session.open) {
-                    session.destroy()
+                if (!jumpConnection) {
+                    throw new Error(`${profile.options.host}: jump host "${profile.options.jumpHost}" not found in your config`)
                 }
-            })
 
-            session.jumpStream = await new Promise((resolve, reject) => jumpSession.ssh.forwardOut(
-                '127.0.0.1', 0, session.profile.options.host, session.profile.options.port ?? 22,
-                (err, stream) => {
-                    if (err) {
-                        jumpSession.emitServiceMessage(colors.bgRed.black(' X ') + ` Could not set up port forward on ${jumpConnection.name}`)
-                        reject(err)
-                        return
+                const jumpSession = await this.setupOneSession(
+                    this.injector,
+                    this.profilesService.getConfigProxyForProfile(jumpConnection),
+                )
+
+                jumpSession.ref()
+                session.willDestroy$.subscribe(() => jumpSession.unref())
+                jumpSession.willDestroy$.subscribe(() => {
+                    if (session?.open) {
+                        session.destroy()
                     }
-                    resolve(stream)
-                }
-            ))
+                })
 
-            session.jumpStream.on('close', () => {
-                jumpSession.destroy()
-            })
-
-            this.sessionStack.push(session)
+                session.jumpStream = await new Promise((resolve, reject) => jumpSession.ssh.forwardOut(
+                    '127.0.0.1', 0, profile.options.host, profile.options.port ?? 22,
+                    (err, stream) => {
+                        if (err) {
+                            jumpSession.emitServiceMessage(colors.bgRed.black(' X ') + ` Could not set up port forward on ${jumpConnection.name}`)
+                            reject(err)
+                            return
+                        }
+                        resolve(stream)
+                    },
+                ))
+            }
         }
 
-        this.write('\r\n' + colors.black.bgWhite(' SSH ') + ` Connecting to ${session.profile.options.host}\r\n`)
-
-        this.startSpinner('Connecting')
-
         this.attachSessionHandler(session.serviceMessage$, msg => {
+            msg = msg.replace(/\n/g, '\r\n      ')
             this.write(`\r${colors.black.bgWhite(' SSH ')} ${msg}\r\n`)
-            session.resize(this.size.columns, this.size.rows)
         })
 
-        this.attachSessionHandler(session.destroyed$, () => {
+        this.attachSessionHandler(session.willDestroy$, () => {
             this.activeKIPrompt = null
         })
 
@@ -141,14 +139,21 @@ export class SSHTabComponent extends BaseTerminalTabComponent {
             })
         })
 
-        try {
-            await session.start(interactive)
-            this.stopSpinner()
-        } catch (e) {
-            this.stopSpinner()
-            this.write(colors.black.bgRed(' X ') + ' ' + colors.red(e.message) + '\r\n')
-            return
+        if (!session.open) {
+            this.write('\r\n' + colors.black.bgWhite(' SSH ') + ` Connecting to ${session.profile.options.host}\r\n`)
+
+            this.startSpinner(this.translate.instant(_('Connecting')))
+
+            try {
+                await session.start()
+            } finally {
+                this.stopSpinner()
+            }
+
+            this.sshMultiplexer.addSession(session)
         }
+
+        return session
     }
 
     protected attachSessionHandlers (): void {
@@ -163,10 +168,10 @@ export class SSHTabComponent extends BaseTerminalTabComponent {
                 this.destroy()
             } else if (this.frontend) {
                 // Session was closed abruptly
-                this.write('\r\n' + colors.black.bgWhite(' SSH ') + ` ${session.profile.options.host}: session closed\r\n`)
+                this.write('\r\n' + colors.black.bgWhite(' SSH ') + ` ${this.sshSession?.profile.options.host}: session closed\r\n`)
                 if (!this.reconnectOffered) {
                     this.reconnectOffered = true
-                    this.write('Press any key to reconnect\r\n')
+                    this.write(this.translate.instant(_('Press any key to reconnect')) + '\r\n')
                     this.input$.pipe(first()).subscribe(() => {
                         if (!this.session?.open && this.reconnectOffered) {
                             this.reconnect()
@@ -178,36 +183,55 @@ export class SSHTabComponent extends BaseTerminalTabComponent {
         super.attachSessionHandlers()
     }
 
-    async initializeSession (): Promise<void> {
-        this.reconnectOffered = false
+    private async initializeSessionMaybeMultiplex (multiplex = true): Promise<void> {
         if (!this.profile) {
-            this.logger.error('No SSH connection info supplied')
-            return
+            throw new Error('No SSH connection info supplied')
         }
 
-        const session = new SSHSession(this.injector, this.profile)
+        this.sshSession = await this.setupOneSession(this.injector, this.profile, multiplex)
+        const session = new SSHShellSession(this.injector, this.sshSession, this.profile)
+
         this.setSession(session)
+        this.attachSessionHandler(session.serviceMessage$, msg => {
+            msg = msg.replace(/\n/g, '\r\n      ')
+            this.write(`\r${colors.black.bgWhite(' SSH ')} ${msg}\r\n`)
+            session.resize(this.size.columns, this.size.rows)
+        })
 
-        try {
-            await this.setupOneSession(session, true)
-        } catch (e) {
-            this.write(colors.black.bgRed(' X ') + ' ' + colors.red(e.message) + '\r\n')
+        await session.start()
+
+        if (this.config.store.ssh.clearServiceMessagesOnConnect) {
+            this.frontend?.clear()
         }
 
-        this.session!.resize(this.size.columns, this.size.rows)
+        this.session?.resize(this.size.columns, this.size.rows)
     }
 
-    async getRecoveryToken (): Promise<RecoveryToken> {
+    async initializeSession (): Promise<void> {
+        this.reconnectOffered = false
+        try {
+            await this.initializeSessionMaybeMultiplex(true)
+        } catch {
+            try {
+                await this.initializeSessionMaybeMultiplex(false)
+            } catch (e) {
+                this.write(colors.black.bgRed(' X ') + ' ' + colors.red(e.message) + '\r\n')
+                return
+            }
+        }
+    }
+
+    async getRecoveryToken (options?: GetRecoveryTokenOptions): Promise<RecoveryToken> {
         return {
             type: 'app:ssh-tab',
             profile: this.profile,
-            savedState: this.frontend?.saveState(),
+            savedState: options?.includeState && this.frontend?.saveState(),
         }
     }
 
     showPortForwarding (): void {
         const modal = this.ngbModal.open(SSHPortForwardingModalComponent).componentInstance as SSHPortForwardingModalComponent
-        modal.session = this.session!
+        modal.session = this.sshSession!
     }
 
     async reconnect (): Promise<void> {
@@ -226,11 +250,14 @@ export class SSHTabComponent extends BaseTerminalTabComponent {
         return (await this.platform.showMessageBox(
             {
                 type: 'warning',
-                message: `Disconnect from ${this.profile?.options.host}?`,
-                buttons: ['Disconnect', 'Do not close'],
+                message: this.translate.instant(_('Disconnect from {host}?'), this.profile?.options),
+                buttons: [
+                    this.translate.instant(_('Disconnect')),
+                    this.translate.instant(_('Do not close')),
+                ],
                 defaultId: 0,
                 cancelId: 1,
-            }
+            },
         )).response === 0
     }
 

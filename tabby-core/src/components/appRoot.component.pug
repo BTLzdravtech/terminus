@@ -9,7 +9,10 @@ title-bar(
     [class.tabs-on-top]='config.store.appearance.tabsLocation == "top" || config.store.appearance.tabsLocation == "left"',
     [class.tabs-on-side]='hasVerticalTabs()',
 )
-    .tab-bar((dblclick)='hostWindow.toggleMaximize()')
+    .tab-bar(
+        *ngIf='!hostWindow.isFullscreen || config.store.appearance.tabsInFullscreen',
+        (dblclick)='hostWindow.toggleMaximize()'
+    )
         .inset.background(*ngIf='hostApp.platform == Platform.macOS \
         && !hostWindow.isFullscreen \
         && config.store.appearance.frame == "thin" \
@@ -25,8 +28,8 @@ title-bar(
                 [index]='idx',
                 [tab]='tab',
                 [active]='tab == app.activeTab',
-                @animateTab,
-                [@.disabled]='hasVerticalTabs()',
+                [@animateTab]='{value: "in", params: {size: targetTabSize}}',
+                [@.disabled]='hasVerticalTabs() || !config.store.accessibility.animations',
                 (click)='app.selectTab(tab)',
                 [class.fully-draggable]='hostApp.platform != Platform.macOS',
                 [class.drag-region]='hostApp.platform == Platform.macOS && !(app.tabDragActive$|async)',
@@ -35,26 +38,14 @@ title-bar(
         .btn-group.background
             .d-flex(
                 *ngFor='let button of leftToolbarButtons',
-                ngbDropdown,
-                (openChange)='generateButtonSubmenu(button)',
+                ngbDropdown
             )
                 button.btn.btn-secondary.btn-tab-bar(
-                    [title]='button.title',
-                    (click)='button.click && button.click()',
+                    [title]='button.label',
+                    (click)='button.run && button.run()',
                     [fastHtmlBind]='button.icon',
                     ngbDropdownToggle,
                 )
-                div(*ngIf='button.submenu', ngbDropdownMenu)
-                    button.dropdown-item.d-flex.align-items-center(
-                        *ngFor='let item of button.submenuItems',
-                        (click)='item.click()',
-                        ngbDropdownItem,
-                    )
-                        .icon-wrapper(
-                            *ngIf='hasIcons(button.submenuItems)',
-                            [fastHtmlBind]='item.icon'
-                        )
-                        div([class.ml-3]='hasIcons(button.submenuItems)') {{item.title}}
 
             .d-flex(
                 ngbDropdown,
@@ -77,26 +68,14 @@ title-bar(
         .btn-group.background
             .d-flex(
                 *ngFor='let button of rightToolbarButtons',
-                ngbDropdown,
-                (openChange)='generateButtonSubmenu(button)',
+                ngbDropdown
             )
                 button.btn.btn-secondary.btn-tab-bar(
                     [title]='button.title',
-                    (click)='button.click && button.click()',
+                    (click)='button.run && button.run()',
                     [fastHtmlBind]='button.icon',
                     ngbDropdownToggle,
                 )
-                div(*ngIf='button.submenu', ngbDropdownMenu)
-                    button.dropdown-item.d-flex.align-items-center(
-                        *ngFor='let item of button.submenuItems',
-                        (click)='item.click()',
-                        ngbDropdownItem,
-                    )
-                        .icon-wrapper(
-                            *ngIf='hasIcons(button.submenuItems)',
-                            [fastHtmlBind]='item.icon'
-                        )
-                        div([class.ml-3]='hasIcons(button.submenuItems)') {{item.title}}
 
             button.btn.btn-secondary.btn-tab-bar.btn-update(
                 *ngIf='updatesAvailable',

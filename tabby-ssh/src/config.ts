@@ -9,6 +9,9 @@ export class SSHConfigProvider extends ConfigProvider {
             agentType: 'auto',
             agentPath: null,
             x11Display: null,
+            knownHosts: [],
+            verifyHostKeys: true,
+            clearServiceMessagesOnConnect: true,
         },
         hotkeys: {
             'restart-ssh-session': [],

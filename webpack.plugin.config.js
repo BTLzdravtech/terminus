@@ -47,6 +47,7 @@ module.exports = options => {
             alias: options.alias ?? {},
             modules: ['.', 'src', 'node_modules', '../app/node_modules', '../node_modules'].map(x => path.join(options.dirname, x)),
             extensions: ['.ts', '.js'],
+            mainFields: ['esm2015', 'browser', 'module', 'main'],
         },
         ignoreWarnings: [/Failed to parse source map/],
         module: {
@@ -55,11 +56,11 @@ module.exports = options => {
                 {
                     test: /\.js$/,
                     enforce: 'pre',
-                    use:                         {
+                    use: {
                         loader: 'source-map-loader',
                         options: {
                             filterSourceMappingUrl: (url, resourcePath) => {
-                                if (/node_modules/.test(resourcePath)) {
+                                if (/node_modules/.test(resourcePath) && !resourcePath.includes('xterm')) {
                                     return false
                                 }
                                 return true
@@ -86,14 +87,26 @@ module.exports = options => {
                 { test: /\.yaml$/, use: ['json-loader', 'yaml-loader'] },
                 { test: /\.svg/, use: ['svg-inline-loader'] },
                 {
-                    test: /\.(ttf|eot|otf|woff|woff2|ogg)(\?v=[0-9]\.[0-9]\.[0-9])?$/,
+                    test: /\.(eot|otf|woff|woff2|ogg)(\?v=[0-9]\.[0-9]\.[0-9])?$/,
                     type: 'asset',
+                },
+                {
+                    test: /\.ttf$/,
+                    type: 'asset/inline',
+                },
+                {
+                    test: /\.po$/,
+                    use: [
+                        { loader: 'json-loader' },
+                        { loader: 'po-gettext-loader' },
+                    ],
                 },
             ],
         },
         externals: [
             '@electron/remote',
             '@serialport/bindings',
+            '@serialport/bindings-cpp',
             'any-promise',
             'child_process',
             'electron-promise-ipc',
@@ -109,12 +122,12 @@ module.exports = options => {
             'os',
             'path',
             'readline',
-            'socksv5',
+            '@luminati-io/socksv5',
             'stream',
             'windows-native-registry',
             'windows-process-tree',
             'windows-process-tree/build/Release/windows_process_tree.node',
-            /^@angular/,
+            /^@angular(?!\/common\/locales)/,
             /^@ng-bootstrap/,
             /^rxjs/,
             /^tabby-/,

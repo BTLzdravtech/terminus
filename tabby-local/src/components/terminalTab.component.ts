@@ -1,5 +1,6 @@
+import { marker as _ } from '@biesbjerg/ngx-translate-extract-marker'
 import { Component, Input, Injector } from '@angular/core'
-import { BaseTabProcess, WIN_BUILD_CONPTY_SUPPORTED, isWindowsBuild } from 'tabby-core'
+import { BaseTabProcess, WIN_BUILD_CONPTY_SUPPORTED, isWindowsBuild, GetRecoveryTokenOptions } from 'tabby-core'
 import { BaseTerminalTabComponent } from 'tabby-terminal'
 import { LocalProfile, SessionOptions } from '../api'
 import { Session } from '../session'
@@ -74,7 +75,7 @@ export class TerminalTabComponent extends BaseTerminalTabComponent {
         this.recoveryStateChangedHint.next()
     }
 
-    async getRecoveryToken (): Promise<any> {
+    async getRecoveryToken (options?: GetRecoveryTokenOptions): Promise<any> {
         const cwd = this.session ? await this.session.getWorkingDirectory() : null
         return {
             type: 'app:local-tab',
@@ -83,10 +84,10 @@ export class TerminalTabComponent extends BaseTerminalTabComponent {
                 options: {
                     ...this.profile.options,
                     cwd: cwd ?? this.profile.options.cwd,
-                    restoreFromPTYID: this.session?.getPTYID(),
+                    restoreFromPTYID: options?.includeState && this.session?.getPTYID(),
                 },
             },
-            savedState: this.frontend?.saveState(),
+            savedState: options?.includeState && this.frontend?.saveState(),
         }
     }
 
@@ -108,11 +109,17 @@ export class TerminalTabComponent extends BaseTerminalTabComponent {
         return (await this.platform.showMessageBox(
             {
                 type: 'warning',
-                message: `"${children[0].command}" is still running. Close?`,
-                buttons: ['Kill', 'Cancel'],
+                message: this.translate.instant(
+                    _('"{command}" is still running. Close?'),
+                    children[0],
+                ),
+                buttons: [
+                    this.translate.instant(_('Kill')),
+                    this.translate.instant(_('Cancel')),
+                ],
                 defaultId: 0,
                 cancelId: 1,
-            }
+            },
         )).response === 0
     }
 

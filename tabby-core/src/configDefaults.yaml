@@ -1,3 +1,5 @@
+accessibility:
+  animations: true
 appearance:
   dock: off
   dockScreen: current
@@ -7,16 +9,21 @@ appearance:
   dockAlwaysOnTop: true
   flexTabs: false
   tabsLocation: top
+  tabsInFullscreen: false
   cycleTabs: true
   theme: Standard
   frame: thin
   css: '/* * { color: blue !important; } */'
   opacity: 1.0
-  vibrancy: true
+  vibrancy: false
   vibrancyType: 'blur'
+  lastTabClosesWindow: false
 terminal:
   showBuiltinProfiles: true
   showRecentProfiles: 3
+  paneResizeStep: 0.1
+  focusFollowsMouse: false
+  identification: null
 hotkeys:
   profile:
     __nonStructural: true
@@ -25,6 +32,8 @@ hotkeys:
 profiles: []
 profileDefaults:
   __nonStructural: true
+  ssh:
+    disableDynamicTitle: true
 recoverTabs: true
 enableAnalytics: true
 enableWelcomeTab: true
@@ -35,3 +44,9 @@ version: 1
 vault: null
 encrypted: false
 enableExperimentalFeatures: false
+pluginBlacklist: []
+hacks:
+  disableGPU: false
+  disableVibrancyWhileDragging: false
+  enableFluentBackground: false
+language: null

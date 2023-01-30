@@ -1,7 +1,4 @@
-.terminal-toolbar(
-    (mouseenter)='showToolbar()',
-    (mouseleave)='hideToolbar()'
-)
+terminal-toolbar([tab]='this')
     i.fas.fa-xs.fa-circle.text-success.mr-2(*ngIf='session && session.open')
     i.fas.fa-xs.fa-circle.text-danger.mr-2(*ngIf='!session || !session.open')
     strong.mr-auto {{profile.options.user}}@{{profile.options.host}}:{{profile.options.port}}
@@ -10,20 +7,20 @@
         ngbDropdown,
         container='body',
         *ngIf='session && !session.supportsWorkingDirectory()',
-        placement='bottom-right'
+        placement='bottom-right bottom-left bottom'
     )
         button.btn.btn-sm.btn-link(ngbDropdownToggle)
-            i.far.fa-lightbulb
+            i.far.fa-lightbulb.text-primary
         .bg-dark(ngbDropdownMenu)
             a.d-flex.align-items-center(ngbDropdownItem, (click)='platform.openExternal("https://tabby.sh/go/cwd-detection")')
                 .mr-auto
-                    strong Working directory detection
-                    div Learn how to allow Tabby to detect remote shell's working directory.
+                    strong(translate) Working directory detection
+                    div(translate) Learn how to allow Tabby to detect remote shell's working directory.
                 i.fas.fa-arrow-right.ml-4
 
     button.btn.btn-sm.btn-link.mr-2((click)='reconnect()')
         i.fas.fa-redo
-        span Reconnect
+        span(translate) Reconnect
 
     button.btn.btn-sm.btn-link.mr-2((click)='openSFTP()', *ngIf='session && session.open')
         i.far.fa-folder-open
@@ -34,15 +31,17 @@
         (click)='showPortForwarding()'
     )
         i.fas.fa-plug
-        span Ports
+        span(translate) Ports
 
 
 sftp-panel.bg-dark(
     @panelSlide,
+    [@.disabled]='!config.store.accessibility.animations',
     [(path)]='sftpPath',
     *ngIf='sftpPanelVisible',
     (click)='$event.stopPropagation()',
-    [session]='session',
+    [session]='sshSession',
+    [cwdDetectionAvailable]='session?.supportsWorkingDirectory()',
     (closed)='sftpPanelVisible = false'
 )
 

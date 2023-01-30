@@ -1,7 +1,8 @@
 import { Injectable, Optional, Inject } from '@angular/core'
-import { BaseTabComponent, TabContextMenuItemProvider, TabHeaderComponent, NotificationsService, MenuItemOptions } from 'tabby-core'
+import { BaseTabComponent, TabContextMenuItemProvider, NotificationsService, MenuItemOptions, TranslateService, SplitTabComponent } from 'tabby-core'
 import { BaseTerminalTabComponent } from './api/baseTerminalTab.component'
 import { TerminalContextMenuItemProvider } from './api/contextMenuProvider'
+import { MultifocusService } from './services/multifocus.service'
 
 /** @hidden */
 @Injectable()
@@ -10,27 +11,28 @@ export class CopyPasteContextMenu extends TabContextMenuItemProvider {
 
     constructor (
         private notifications: NotificationsService,
+        private translate: TranslateService,
     ) {
         super()
     }
 
-    async getItems (tab: BaseTabComponent, tabHeader?: TabHeaderComponent): Promise<MenuItemOptions[]> {
+    async getItems (tab: BaseTabComponent, tabHeader?: boolean): Promise<MenuItemOptions[]> {
         if (tabHeader) {
             return []
         }
         if (tab instanceof BaseTerminalTabComponent) {
             return [
                 {
-                    label: 'Copy',
+                    label: this.translate.instant('Copy'),
                     click: (): void => {
                         setTimeout(() => {
                             tab.frontend?.copySelection()
-                            this.notifications.notice('Copied')
+                            this.notifications.notice(this.translate.instant('Copied'))
                         })
                     },
                 },
                 {
-                    label: 'Paste',
+                    label: this.translate.instant('Paste'),
                     click: () => tab.paste(),
                 },
             ]
@@ -44,14 +46,42 @@ export class CopyPasteContextMenu extends TabContextMenuItemProvider {
 export class MiscContextMenu extends TabContextMenuItemProvider {
     weight = 1
 
+    constructor (
+        private translate: TranslateService,
+        private multifocus: MultifocusService,
+    ) { super() }
+
     async getItems (tab: BaseTabComponent): Promise<MenuItemOptions[]> {
-        if (tab instanceof BaseTerminalTabComponent && tab.session?.supportsWorkingDirectory()) {
-            return [{
-                label: 'Copy current path',
-                click: () => tab.copyCurrentPath(),
-            }]
+        const items: MenuItemOptions[] = []
+        if (tab instanceof BaseTerminalTabComponent && tab.enableToolbar && !tab.pinToolbar) {
+            items.push({
+                label: this.translate.instant('Show toolbar'),
+                click: () => {
+                    tab.pinToolbar = true
+                },
+            })
         }
-        return []
+        if (tab instanceof BaseTerminalTabComponent && tab.session?.supportsWorkingDirectory()) {
+            items.push({
+                label: this.translate.instant('Copy current path'),
+                click: () => tab.copyCurrentPath(),
+            })
+        }
+        items.push({
+            label: this.translate.instant('Focus all tabs'),
+            click: () => {
+                this.multifocus.focusAllTabs()
+            },
+        })
+        if (tab.parent instanceof SplitTabComponent && tab.parent.getAllTabs().length > 1) {
+            items.push({
+                label: this.translate.instant('Focus all panes'),
+                click: () => {
+                    this.multifocus.focusAllPanes()
+                },
+            })
+        }
+        return items
     }
 }
 
@@ -66,7 +96,7 @@ export class LegacyContextMenu extends TabContextMenuItemProvider {
         super()
     }
 
-    async getItems (tab: BaseTabComponent, _tabHeader?: TabHeaderComponent): Promise<MenuItemOptions[]> {
+    async getItems (tab: BaseTabComponent): Promise<MenuItemOptions[]> {
         if (!this.contextMenuProviders) {
             return []
         }

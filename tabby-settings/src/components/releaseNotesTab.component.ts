@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
+import { marker as _ } from '@biesbjerg/ngx-translate-extract-marker'
 import axios from 'axios'
-import marked from 'marked'
-import { Component } from '@angular/core'
-import { BaseTabComponent } from 'tabby-core'
+import { marked } from 'marked'
+import { Component, Injector } from '@angular/core'
+import { BaseTabComponent, TranslateService } from 'tabby-core'
 
 export interface Release {
     name: string
@@ -21,9 +22,9 @@ export class ReleaseNotesComponent extends BaseTabComponent {
     releases: Release[] = []
     lastPage = 1
 
-    constructor () {
-        super()
-        this.setTitle('Release notes')
+    constructor (translate: TranslateService, injector: Injector) {
+        super(injector)
+        this.setTitle(translate.instant(_('Release notes')))
         this.loadReleases(1)
     }
 

@@ -1,16 +1,15 @@
 import * as path from 'path'
 import * as fs from 'fs/promises'
-import * as gracefulFS from 'graceful-fs'
 import * as fsSync from 'fs'
 import * as os from 'os'
-import { promisify } from 'util'
 import promiseIpc, { RendererProcessType } from 'electron-promise-ipc'
 import { execFile } from 'mz/child_process'
 import { Injectable, NgZone } from '@angular/core'
-import { PlatformService, ClipboardContent, HostAppService, Platform, MenuItemOptions, MessageBoxOptions, MessageBoxResult, FileUpload, FileDownload, FileUploadOptions, wrapPromise } from 'tabby-core'
+import { PlatformService, ClipboardContent, Platform, MenuItemOptions, MessageBoxOptions, MessageBoxResult, FileUpload, FileDownload, FileUploadOptions, wrapPromise, TranslateService } from 'tabby-core'
 import { ElectronService } from '../services/electron.service'
 import { ElectronHostWindow } from './hostWindow.service'
 import { ShellIntegrationService } from './shellIntegration.service'
+import { ElectronHostAppService } from './hostApp.service'
 const fontManager = require('fontmanager-redux') // eslint-disable-line
 
 /* eslint-disable block-scoped-var */
@@ -26,14 +25,14 @@ try {
 export class ElectronPlatformService extends PlatformService {
     supportsWindowControls = true
     private configPath: string
-    private _configSaveInProgress = Promise.resolve()
 
     constructor (
-        private hostApp: HostAppService,
+        private hostApp: ElectronHostAppService,
         private hostWindow: ElectronHostWindow,
         private electron: ElectronService,
         private zone: NgZone,
         private shellIntegration: ShellIntegrationService,
+        private translate: TranslateService,
     ) {
         super()
         this.configPath = path.join(electron.app.getPath('userData'), 'config.yaml')
@@ -81,8 +80,8 @@ export class ElectronPlatformService extends PlatformService {
         return null
     }
 
-    exec (app: string, argv: string[]): void {
-        execFile(app, argv)
+    async exec (app: string, argv: string[]): Promise<void> {
+        await execFile(app, argv)
     }
 
     isShellIntegrationSupported (): boolean {
@@ -110,18 +109,7 @@ export class ElectronPlatformService extends PlatformService {
     }
 
     async saveConfig (content: string): Promise<void> {
-        try {
-            await this._configSaveInProgress
-        } catch { }
-        this._configSaveInProgress = this._saveConfigInternal(content)
-        await this._configSaveInProgress
-    }
-
-    async _saveConfigInternal (content: string): Promise<void> {
-        const tempPath = this.configPath + '.new'
-        await fs.writeFile(tempPath, content, 'utf8')
-        await fs.writeFile(this.configPath + '.backup', content, 'utf8')
-        await promisify(gracefulFS.rename)(tempPath, this.configPath)
+        await this.hostApp.saveConfig(content)
     }
 
     getConfigPath (): string|null {
@@ -150,7 +138,7 @@ export class ElectronPlatformService extends PlatformService {
 
     async listFonts (): Promise<string[]> {
         if (this.hostApp.platform === Platform.Windows || this.hostApp.platform === Platform.macOS) {
-            let fonts = await new Promise<any[]>((resolve) => fontManager.findFonts({ monospace: true }, resolve))
+            let fonts = await new Promise<any[]>(resolve => fontManager.getAvailableFonts(resolve))
             fonts = fonts.map(x => x.family.trim())
             return fonts
         }
@@ -204,7 +192,7 @@ export class ElectronPlatformService extends PlatformService {
             const result = await this.electron.dialog.showOpenDialog(
                 this.hostWindow.getWindow(),
                 {
-                    buttonLabel: 'Select',
+                    buttonLabel: this.translate.instant('Select'),
                     properties,
                 },
             )

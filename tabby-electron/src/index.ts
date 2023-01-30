@@ -1,7 +1,8 @@
 import { NgModule } from '@angular/core'
 import { PlatformService, LogService, UpdaterService, DockingService, HostAppService, ThemesService, Platform, AppService, ConfigService, WIN_BUILD_FLUENT_BG_SUPPORTED, isWindowsBuild, HostWindowService, HotkeyProvider, ConfigProvider, FileProvider } from 'tabby-core'
 import { TerminalColorSchemeProvider } from 'tabby-terminal'
-import { SFTPContextMenuItemProvider } from 'tabby-ssh'
+import { SFTPContextMenuItemProvider, SSHProfileImporter, AutoPrivateKeyLocator } from 'tabby-ssh'
+import { auditTime } from 'rxjs'
 
 import { HyperColorSchemes } from './colorSchemes'
 import { ElectronPlatformService } from './services/platform.service'
@@ -16,6 +17,7 @@ import { ElectronService } from './services/electron.service'
 import { ElectronHotkeyProvider } from './hotkeys'
 import { ElectronConfigProvider } from './config'
 import { EditSFTPContextMenu } from './sftpContextMenu'
+import { OpenSSHImporter, PrivateKeyLocator, StaticFileImporter } from './sshImporters'
 
 @NgModule({
     providers: [
@@ -30,6 +32,9 @@ import { EditSFTPContextMenu } from './sftpContextMenu'
         { provide: ConfigProvider, useClass: ElectronConfigProvider, multi: true },
         { provide: FileProvider, useClass: ElectronFileProvider, multi: true },
         { provide: SFTPContextMenuItemProvider, useClass: EditSFTPContextMenu, multi: true },
+        { provide: SSHProfileImporter, useExisting: OpenSSHImporter, multi: true },
+        { provide: SSHProfileImporter, useExisting: StaticFileImporter, multi: true },
+        { provide: AutoPrivateKeyLocator, useExisting: PrivateKeyLocator, multi: true },
     ],
 })
 export default class ElectronModule {
@@ -68,7 +73,7 @@ export default class ElectronModule {
 
         let lastProgress: number|null = null
         app.tabOpened$.subscribe(tab => {
-            tab.progress$.subscribe(progress => {
+            tab.progress$.pipe(auditTime(250)).subscribe(progress => {
                 if (lastProgress === progress) {
                     return
                 }
@@ -113,7 +118,6 @@ export default class ElectronModule {
         if (this.hostApp.platform === Platform.Windows && !isWindowsBuild(WIN_BUILD_FLUENT_BG_SUPPORTED)) {
             vibrancyType = null
         }
-        document.body.classList.toggle('vibrant', this.config.store.appearance.vibrancy)
         this.electron.ipcRenderer.send('window-set-vibrancy', this.config.store.appearance.vibrancy, vibrancyType)
 
         this.hostWindow.setOpacity(this.config.store.appearance.opacity)

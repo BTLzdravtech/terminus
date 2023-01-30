@@ -25,7 +25,10 @@ export function parseArgs (argv: string[], cwd: string): any {
                 type: 'string',
             })
         })
-        .version('version', '', app.getVersion())
+        .command('recent [index]', 'open a tab with a recent profile', {
+            profileNumber: { type: 'number' },
+        })
+        .version(app.getVersion())
         .option('debug', {
             alias: 'd',
             describe: 'Show DevTools on start',
@@ -33,11 +36,6 @@ export function parseArgs (argv: string[], cwd: string): any {
         })
         .option('hidden', {
             describe: 'Start minimized',
-            type: 'boolean',
-        })
-        .option('version', {
-            alias: 'v',
-            describe: 'Show version and exit',
             type: 'boolean',
         })
         .help('help')

@@ -1,4 +1,4 @@
-import * as fs from 'mz/fs'
+import * as fsSync from 'fs'
 import { Injectable } from '@angular/core'
 import { Logger, LogService, ConfigService, ProfilesService, PartialProfile } from 'tabby-core'
 import { TerminalTabComponent } from '../components/terminalTab.component'
@@ -39,7 +39,7 @@ export class TerminalService {
 
         cwd = cwd ?? fullProfile.options.cwd
 
-        if (cwd && !fs.existsSync(cwd)) {
+        if (cwd && !fsSync.existsSync(cwd)) {
             console.warn('Ignoring non-existent CWD:', cwd)
             cwd = null
         }
@@ -47,7 +47,8 @@ export class TerminalService {
         this.logger.info(`Starting profile ${fullProfile.name}`, fullProfile)
         const options = {
             ...fullProfile.options,
-            pauseAfterExit: pause,
+            // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+            pauseAfterExit: fullProfile.options.pauseAfterExit || pause,
             cwd: cwd ?? undefined,
         }
 

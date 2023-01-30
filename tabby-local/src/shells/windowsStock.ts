@@ -1,21 +1,22 @@
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import hasbin from 'hasbin'
-import { promisify } from 'util'
 import { Injectable } from '@angular/core'
-import { HostAppService, Platform } from 'tabby-core'
+import { HostAppService, Platform, ConfigService } from 'tabby-core'
 import { ElectronService } from 'tabby-electron'
 
-import { ShellProvider, Shell } from '../api'
+import { Shell } from '../api'
+import { WindowsBaseShellProvider } from './windowsBase'
 
 /** @hidden */
 @Injectable()
-export class WindowsStockShellsProvider extends ShellProvider {
+export class WindowsStockShellsProvider extends WindowsBaseShellProvider {
     constructor (
-        private hostApp: HostAppService,
+        hostApp: HostAppService,
+        config: ConfigService,
         private electron: ElectronService,
     ) {
-        super()
+        super(hostApp, config)
     }
 
     async provide (): Promise<Shell[]> {
@@ -65,29 +66,28 @@ export class WindowsStockShellsProvider extends ShellProvider {
                 command: await this.getPowerShellPath(),
                 args: ['-nologo'],
                 icon: require('../icons/powershell.svg'),
-                env: {
-                    TERM: 'cygwin',
-                },
+                env: this.getEnvironment(),
             },
         ]
     }
 
     private async getPowerShellPath () {
-        const ps = 'powershell.exe'
-
-        if (!await promisify(hasbin)(ps)) {
-            for (const searchPath of [
-                `${process.env.SystemRoot}\\System32\\WindowsPowerShell\\v1.0`,
-                `${process.env.SystemRoot}\\System32`,
-                process.env.SystemRoot ?? 'C:\\Windows',
-            ]) {
-                const newPath = path.join(searchPath, ps)
-                try {
-                    await fs.stat(newPath)
-                    return newPath
-                } catch { }
+        for (const name of ['pwsh.exe', 'powershell.exe']) {
+            if (await new Promise(resolve => hasbin(name, resolve))) {
+                return name
             }
         }
-        return ps
+        for (const psPath of [
+            `${process.env.USERPROFILE}\\AppData\\Local\\Microsoft\\WindowsApps\\pwsh.exe`,
+            `${process.env.SystemRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`,
+            `${process.env.SystemRoot}\\System32\\powershell.exe`,
+            (process.env.SystemRoot ?? 'C:\\Windows') + '\\powerhshell.exe',
+        ]) {
+            try {
+                await fs.stat(psPath)
+                return psPath
+            } catch { }
+        }
+        return 'powershell.exe'
     }
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
 const builder = require('electron-builder').build
 const vars = require('./vars')
 
@@ -15,6 +16,7 @@ if (process.env.GITHUB_HEAD_REF) {
 builder({
     dir: true,
     mac: ['pkg', 'zip'],
+    x64: process.env.ARCH === 'x86_64',
     arm64: process.env.ARCH === 'arm64',
     config: {
         extraMetadata: {
@@ -24,8 +26,15 @@ builder({
             identity: !process.env.CI || process.env.CSC_LINK ? undefined : null,
         },
         npmRebuild: process.env.ARCH !== 'arm64',
+        publish: process.env.KEYGEN_TOKEN ? [
+            vars.keygenConfig,
+            {
+                provider: 'github',
+                channel: `latest-${process.env.ARCH}`,
+            },
+        ] : undefined,
     },
-    publish: isTag ? 'always' : 'onTag',
+    publish: process.env.KEYGEN_TOKEN ? isTag ? 'always' : 'onTagOrDraft' : 'never',
 }).catch(e => {
     console.error(e)
     process.exit(1)

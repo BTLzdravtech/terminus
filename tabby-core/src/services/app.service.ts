@@ -1,8 +1,10 @@
-import { Observable, Subject, AsyncSubject, takeUntil } from 'rxjs'
 import { Injectable, Inject } from '@angular/core'
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
+import { Observable, Subject, AsyncSubject, takeUntil, debounceTime } from 'rxjs'
 
 import { BaseTabComponent } from '../components/baseTab.component'
 import { SplitTabComponent } from '../components/splitTab.component'
+import { RenameTabModalComponent } from '../components/renameTabModal.component'
 import { SelectorOption } from '../api/selector'
 import { RecoveryToken } from '../api/tabRecovery'
 import { BootstrapData, BOOTSTRAP_DATA } from '../api/mainProcess'
@@ -58,6 +60,7 @@ export class AppService {
     private tabClosed = new Subject<BaseTabComponent>()
     private tabDragActive = new Subject<BaseTabComponent|null>()
     private ready = new AsyncSubject<void>()
+    private recoveryStateChangedHint = new Subject<void>()
 
     private completionObservers = new Map<BaseTabComponent, CompletionObserver>()
 
@@ -79,17 +82,23 @@ export class AppService {
         private tabRecovery: TabRecoveryService,
         private tabsService: TabsService,
         private selector: SelectorService,
+        private ngbModal: NgbModal,
         @Inject(BOOTSTRAP_DATA) private bootstrapData: BootstrapData,
     ) {
         this.tabsChanged$.subscribe(() => {
-            this.tabRecovery.saveTabs(this.tabs)
+            this.recoveryStateChangedHint.next()
         })
+
         setInterval(() => {
-            this.tabRecovery.saveTabs(this.tabs)
+            this.recoveryStateChangedHint.next()
         }, 30000)
 
+        this.recoveryStateChangedHint.pipe(debounceTime(1000)).subscribe(() => {
+            this.tabRecovery.saveTabs(this.tabs)
+        })
+
         config.ready$.toPromise().then(async () => {
-            if (this.bootstrapData.isFirstWindow) {
+            if (this.bootstrapData.isMainWindow) {
                 if (config.store.recoverTabs) {
                     const tabs = await this.tabRecovery.recoverTabs()
                     for (const tab of tabs) {
@@ -101,14 +110,13 @@ export class AppService {
             }
         })
 
-        hostWindow.windowFocused$.subscribe(() => this._activeTab?.emitFocused())
-
-        this.tabClosed$.subscribe(async tab => {
-            const token = await tabRecovery.getFullRecoveryToken(tab)
-            if (token) {
-                this.closedTabsStack.push(token)
+        this.tabClosed$.subscribe(() => {
+            if (!this.tabs.length && this.config.store.appearance.lastTabClosesWindow) {
+                this.hostWindow.close()
             }
         })
+
+        hostWindow.windowFocused$.subscribe(() => this._activeTab?.emitFocused())
     }
 
     addTabRaw (tab: BaseTabComponent, index: number|null = null): void {
@@ -122,9 +130,9 @@ export class AppService {
         this.tabsChanged.next()
         this.tabOpened.next(tab)
 
-        if (this.bootstrapData.isFirstWindow) {
+        if (this.bootstrapData.isMainWindow) {
             tab.recoveryStateChangedHint$.subscribe(() => {
-                this.tabRecovery.saveTabs(this.tabs)
+                this.recoveryStateChangedHint.next()
             })
         }
 
@@ -151,7 +159,7 @@ export class AppService {
     }
 
     removeTab (tab: BaseTabComponent): void {
-        const newIndex = Math.max(0, this.tabs.indexOf(tab) - 1)
+        const newIndex = Math.min(this.tabs.length - 2, this.tabs.indexOf(tab))
         this.tabs = this.tabs.filter((x) => x !== tab)
         if (tab === this._activeTab) {
             this.selectTab(this.tabs[newIndex])
@@ -177,11 +185,19 @@ export class AppService {
         if (params.type as any === SplitTabComponent) {
             return this.openNewTabRaw(params)
         }
-        const splitTab = this.tabsService.create({ type: SplitTabComponent })
         const tab = this.tabsService.create(params)
+        this.wrapAndAddTab(tab)
+        return tab
+    }
+
+    /**
+     * Adds an existing tab while wrapping it in a SplitTabComponent
+     */
+    wrapAndAddTab (tab: BaseTabComponent): SplitTabComponent {
+        const splitTab = this.tabsService.create({ type: SplitTabComponent })
         splitTab.addTab(tab, null, 'r')
         this.addTabRaw(splitTab)
-        return tab
+        return splitTab
     }
 
     async reopenLastTab (): Promise<BaseTabComponent|null> {
@@ -305,6 +321,16 @@ export class AppService {
         this.tabs[i2] = a
     }
 
+    renameTab (tab: BaseTabComponent): void {
+        const modal = this.ngbModal.open(RenameTabModalComponent)
+        modal.componentInstance.value = tab.customTitle || tab.title
+        modal.result.then(result => {
+            tab.setTitle(result)
+            tab.customTitle = result
+            this.emitTabsChanged()
+        }).catch(() => null)
+    }
+
     /** @hidden */
     emitTabsChanged (): void {
         this.tabsChanged.next()
@@ -316,6 +342,11 @@ export class AppService {
         }
         if (checkCanClose && !await tab.canClose()) {
             return
+        }
+        const token = await this.tabRecovery.getFullRecoveryToken(tab, { includeState: true })
+        if (token) {
+            this.closedTabsStack.push(token)
+            this.closedTabsStack = this.closedTabsStack.slice(-5)
         }
         tab.destroy()
     }
@@ -392,5 +423,41 @@ export class AppService {
     // Deprecated
     showSelector <T> (name: string, options: SelectorOption<T>[]): Promise<T> {
         return this.selector.show(name, options)
+    }
+
+    explodeTab (tab: SplitTabComponent): SplitTabComponent[] {
+        const result: SplitTabComponent[] = []
+        for (const child of tab.getAllTabs().slice(1)) {
+            tab.removeTab(child)
+            result.push(this.wrapAndAddTab(child))
+        }
+        return result
+    }
+
+    combineTabsInto (into: SplitTabComponent): void {
+        this.explodeTab(into)
+
+        let allChildren: BaseTabComponent[] = []
+        for (const tab of this.tabs) {
+            if (into === tab) {
+                continue
+            }
+            let children = [tab]
+            if (tab instanceof SplitTabComponent) {
+                children = tab.getAllTabs()
+            }
+            allChildren = allChildren.concat(children)
+        }
+
+        let x = 1
+        let previous: BaseTabComponent|null = null
+        const stride = Math.ceil(Math.sqrt(allChildren.length + 1))
+        for (const child of allChildren) {
+            into.add(child, x ? previous : null, x ? 'r' : 'b')
+            previous = child
+            x = (x + 1) % stride
+        }
+
+        into.equalize()
     }
 }

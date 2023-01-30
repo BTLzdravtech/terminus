@@ -3,6 +3,7 @@ import { BrowserModule } from '@angular/platform-browser'
 import { FormsModule } from '@angular/forms'
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap'
 import { ToastrModule } from 'ngx-toastr'
+import { NgxColorsModule } from 'ngx-colors'
 
 import TabbyCorePlugin, { ConfigProvider, HotkeyProvider, TabContextMenuItemProvider, CLIHandler } from 'tabby-core'
 import { SettingsTabProvider } from 'tabby-settings'
@@ -15,8 +16,7 @@ import { ColorSchemePreviewComponent } from './components/colorSchemePreview.com
 import { SearchPanelComponent } from './components/searchPanel.component'
 import { StreamProcessingSettingsComponent } from './components/streamProcessingSettings.component'
 import { LoginScriptsSettingsComponent } from './components/loginScriptsSettings.component'
-
-import { TerminalFrontendService } from './services/terminalFrontend.service'
+import { TerminalToolbarComponent } from './components/terminalToolbar.component'
 
 import { TerminalDecorator } from './api/decorator'
 import { TerminalContextMenuItemProvider } from './api/contextMenuProvider'
@@ -41,6 +41,7 @@ import { TerminalCLIHandler } from './cli'
         NgbModule,
         ToastrModule,
         TabbyCorePlugin,
+        NgxColorsModule,
     ],
     providers: [
         { provide: SettingsTabProvider, useClass: AppearanceSettingsTabProvider, multi: true },
@@ -73,22 +74,26 @@ import { TerminalCLIHandler } from './cli'
         SearchPanelComponent,
         StreamProcessingSettingsComponent,
         LoginScriptsSettingsComponent,
+        TerminalToolbarComponent,
     ],
     exports: [
         ColorPickerComponent,
         SearchPanelComponent,
         StreamProcessingSettingsComponent,
         LoginScriptsSettingsComponent,
+        TerminalToolbarComponent,
     ],
 })
 export default class TerminalModule { } // eslint-disable-line @typescript-eslint/no-extraneous-class
 
-export { TerminalFrontendService, TerminalDecorator, TerminalContextMenuItemProvider, TerminalColorSchemeProvider }
+export { TerminalDecorator, TerminalContextMenuItemProvider, TerminalColorSchemeProvider }
 export { Frontend, XTermFrontend, XTermWebGLFrontend }
 export { BaseTerminalTabComponent } from './api/baseTerminalTab.component'
 export * from './api/interfaces'
-export * from './api/streamProcessing'
-export * from './api/loginScriptProcessing'
-export * from './api/osc1337Processing'
+export * from './middleware/streamProcessing'
+export * from './middleware/loginScriptProcessing'
+export * from './middleware/oscProcessing'
+export * from './api/middleware'
 export * from './session'
 export { LoginScriptsSettingsComponent, StreamProcessingSettingsComponent }
+export { MultifocusService } from './services/multifocus.service'

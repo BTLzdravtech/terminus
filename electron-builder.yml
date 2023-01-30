@@ -34,21 +34,19 @@ extraResources:
 - extras
 asarUnpack:
 - 'dist/*.map'
-publish:
-- provider: github
 
 win:
   icon: "./build/windows/icon.ico"
-  artifactName: tabby-${version}-portable.${ext}
-  rfc3161TimeStampServer: http://sha256timestamp.ws.symantec.com/sha256/timestamp
+  artifactName: tabby-${version}-portable-${env.ARCH}.${ext}
+  rfc3161TimeStampServer: http://timestamp.sectigo.com
 nsis:
   oneClick: false
-  artifactName: tabby-${version}-setup.${ext}
+  artifactName: tabby-${version}-setup-${env.ARCH}.${ext}
   installerIcon: "./build/windows/icon.ico"
   allowToChangeInstallationDirectory: true
   shortcutName: Tabby Terminal
 mac:
-  category: public.app-category.video
+  category: public.app-category.utilities
   icon: "./build/mac/icon.icns"
   artifactName: tabby-${version}-macos-${env.ARCH}.${ext}
   hardenedRuntime: true
@@ -66,9 +64,9 @@ mac:
     NSRemovableVolumesUsageDescription: 'A subprocess requests access to files on a removable volume.'
 
 linux:
-  category: Utility
+  category: "Utility;TerminalEmulator;System"
   icon: "./build/icons"
-  artifactName: tabby-${version}-linux.${ext}
+  artifactName: tabby-${version}-linux-${env.ARCH}.${ext}
   executableArgs:
   - "--no-sandbox"
   desktop:

@@ -42,4 +42,14 @@ export class AppearanceSettingsTabComponent {
             this.config.requestRestart()
         }
     }
+
+    fixFontSize () {
+        this.config.store.terminal.fontSize = Math.min(
+            50,
+            Math.max(
+                5,
+                this.config.store.terminal.fontSize,
+            ),
+        )
+    }
 }

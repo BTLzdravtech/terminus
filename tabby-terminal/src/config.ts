@@ -7,8 +7,10 @@ export class TerminalConfigProvider extends ConfigProvider {
             'copy-current-path': [],
         },
         terminal: {
-            frontend: 'xterm',
+            frontend: 'xterm-webgl',
             fontSize: 14,
+            fontWeight: 400,
+            fontWeightBold: 700,
             fallbackFont: null,
             linePadding: 0,
             bell: 'off',
@@ -18,10 +20,13 @@ export class TerminalConfigProvider extends ConfigProvider {
             cursor: 'block',
             cursorBlink: true,
             hideTabIndex: false,
+            showTabProfileIcon: false,
             hideCloseButton: false,
+            hideTabOptionsButton: false,
             rightClick: 'menu',
             pasteOnMiddleClick: true,
             copyOnSelect: false,
+            copyAsHTML: true,
             scrollOnInput: true,
             altIsMeta: false,
             wordSeparator: ' ()[]{}\'"',
@@ -62,6 +67,10 @@ export class TerminalConfigProvider extends ConfigProvider {
             },
             detectProgress: true,
             scrollbackLines: 25000,
+            drawBoldTextInBrightColors: true,
+            sixel: true,
+            minimumContrastRatio: 4,
+            trimWhitespaceOnPaste: true,
         },
     }
 
@@ -98,6 +107,7 @@ export class TerminalConfigProvider extends ConfigProvider {
                 'previous-word': ['⌥-Left'],
                 'next-word': ['⌥-Right'],
                 'delete-previous-word': ['⌥-Backspace'],
+                'delete-line': ['⌘-Backspace'],
                 'delete-next-word': ['⌥-Delete'],
                 search: [
                     '⌘-F',
@@ -105,12 +115,19 @@ export class TerminalConfigProvider extends ConfigProvider {
                 'pane-focus-all': [
                     '⌘-Shift-I',
                 ],
+                'focus-all-tabs': [
+                    '⌘-⌥-Shift-I',
+                ],
+                'scroll-to-top': ['Shift-PageUp'],
+                'scroll-up': ['⌥-PageUp'],
+                'scroll-down': ['⌥-PageDown'],
+                'scroll-to-bottom': ['Shift-PageDown'],
             },
         },
         [Platform.Windows]: {
             terminal: {
                 font: 'Consolas',
-                rightClick: 'paste',
+                rightClick: 'clipboard',
                 pasteOnMiddleClick: false,
                 copyOnSelect: true,
             },
@@ -141,6 +158,7 @@ export class TerminalConfigProvider extends ConfigProvider {
                 'previous-word': ['Ctrl-Left'],
                 'next-word': ['Ctrl-Right'],
                 'delete-previous-word': ['Ctrl-Backspace'],
+                'delete-line': ['Ctrl-Shift-Backspace'],
                 'delete-next-word': ['Ctrl-Delete'],
                 search: [
                     'Ctrl-Shift-F',
@@ -148,11 +166,19 @@ export class TerminalConfigProvider extends ConfigProvider {
                 'pane-focus-all': [
                     'Ctrl-Shift-I',
                 ],
+                'focus-all-tabs': [
+                    'Ctrl-Alt-Shift-I',
+                ],
+                'scroll-to-top': ['Ctrl-PageUp'],
+                'scroll-up': ['Alt-PageUp'],
+                'scroll-down': ['Alt-PageDown'],
+                'scroll-to-bottom': ['Ctrl-PageDown'],
             },
         },
         [Platform.Linux]: {
             terminal: {
                 font: 'Liberation Mono',
+                pasteOnMiddleClick: false, // handled by OS
             },
             hotkeys: {
                 'ctrl-c': ['Ctrl-C'],
@@ -181,6 +207,7 @@ export class TerminalConfigProvider extends ConfigProvider {
                 'previous-word': ['Ctrl-Left'],
                 'next-word': ['Ctrl-Right'],
                 'delete-previous-word': ['Ctrl-Backspace'],
+                'delete-line': ['Ctrl-Shift-Backspace'],
                 'delete-next-word': ['Ctrl-Delete'],
                 search: [
                     'Ctrl-Shift-F',
@@ -188,6 +215,13 @@ export class TerminalConfigProvider extends ConfigProvider {
                 'pane-focus-all': [
                     'Ctrl-Shift-I',
                 ],
+                'focus-all-tabs': [
+                    'Ctrl-Alt-Shift-I',
+                ],
+                'scroll-to-top': ['Ctrl-PageUp'],
+                'scroll-up': ['Alt-PageUp'],
+                'scroll-down': ['Alt-PageDown'],
+                'scroll-to-bottom': ['Ctrl-PageDown'],
             },
         },
     }

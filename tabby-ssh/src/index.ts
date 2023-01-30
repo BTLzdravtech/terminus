@@ -16,6 +16,7 @@ import { SSHTabComponent } from './components/sshTab.component'
 import { SFTPPanelComponent } from './components/sftpPanel.component'
 import { SFTPDeleteModalComponent } from './components/sftpDeleteModal.component'
 import { KeyboardInteractiveAuthComponent } from './components/keyboardInteractiveAuthPanel.component'
+import { HostKeyPromptModalComponent } from './components/hostKeyPromptModal.component'
 
 import { SSHConfigProvider } from './config'
 import { SSHSettingsTabProvider } from './settings'
@@ -25,6 +26,7 @@ import { SFTPContextMenu } from './tabContextMenu'
 import { SSHProfilesService } from './profiles'
 import { SFTPContextMenuItemProvider } from './api/contextMenu'
 import { CommonSFTPContextMenu } from './sftpContextMenu'
+import { SFTPCreateDirectoryModalComponent } from './components/sftpCreateDirectoryModal.component'
 
 /** @hidden */
 @NgModule({
@@ -49,19 +51,23 @@ import { CommonSFTPContextMenu } from './sftpContextMenu'
     entryComponents: [
         SSHProfileSettingsComponent,
         SFTPDeleteModalComponent,
+        SFTPCreateDirectoryModalComponent,
         SSHPortForwardingModalComponent,
         SSHSettingsTabComponent,
         SSHTabComponent,
+        HostKeyPromptModalComponent,
     ],
     declarations: [
         SSHProfileSettingsComponent,
         SFTPDeleteModalComponent,
+        SFTPCreateDirectoryModalComponent,
         SSHPortForwardingModalComponent,
         SSHPortForwardingConfigComponent,
         SSHSettingsTabComponent,
         SSHTabComponent,
         SFTPPanelComponent,
         KeyboardInteractiveAuthComponent,
+        HostKeyPromptModalComponent,
     ],
 })
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
@@ -69,4 +75,4 @@ export default class SSHModule { }
 
 export * from './api'
 export { SFTPFile, SFTPSession } from './session/sftp'
-export { SFTPPanelComponent, SFTPContextMenuItemProvider }
+export { SFTPPanelComponent }

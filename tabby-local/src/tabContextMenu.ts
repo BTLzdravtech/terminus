@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
-import { ConfigService, BaseTabComponent, TabContextMenuItemProvider, TabHeaderComponent, SplitTabComponent, NotificationsService, MenuItemOptions, ProfilesService, PromptModalComponent } from 'tabby-core'
+import { ConfigService, BaseTabComponent, TabContextMenuItemProvider, NotificationsService, MenuItemOptions, ProfilesService, PromptModalComponent, TranslateService } from 'tabby-core'
 import { TerminalTabComponent } from './components/terminalTab.component'
 import { UACService } from './services/uac.service'
 import { TerminalService } from './services/terminal.service'
@@ -13,20 +13,21 @@ export class SaveAsProfileContextMenu extends TabContextMenuItemProvider {
         private config: ConfigService,
         private ngbModal: NgbModal,
         private notifications: NotificationsService,
+        private translate: TranslateService,
     ) {
         super()
     }
 
-    async getItems (tab: BaseTabComponent, _tabHeader?: TabHeaderComponent): Promise<MenuItemOptions[]> {
+    async getItems (tab: BaseTabComponent): Promise<MenuItemOptions[]> {
         if (!(tab instanceof TerminalTabComponent)) {
             return []
         }
         const items: MenuItemOptions[] = [
             {
-                label: 'Save as profile',
+                label: this.translate.instant('Save as profile'),
                 click: async () => {
                     const modal = this.ngbModal.open(PromptModalComponent)
-                    modal.componentInstance.prompt = 'New profile name'
+                    modal.componentInstance.prompt = this.translate.instant('New profile name')
                     const name = (await modal.result)?.value
                     if (!name) {
                         return
@@ -44,7 +45,7 @@ export class SaveAsProfileContextMenu extends TabContextMenuItemProvider {
                         profile,
                     ]
                     this.config.save()
-                    this.notifications.info('Saved')
+                    this.notifications.info(this.translate.instant('Saved'))
                 },
             },
         ]
@@ -63,16 +64,17 @@ export class NewTabContextMenu extends TabContextMenuItemProvider {
         private profilesService: ProfilesService,
         private terminalService: TerminalService,
         private uac: UACService,
+        private translate: TranslateService,
     ) {
         super()
     }
 
-    async getItems (tab: BaseTabComponent, tabHeader?: TabHeaderComponent): Promise<MenuItemOptions[]> {
+    async getItems (tab: BaseTabComponent, tabHeader?: boolean): Promise<MenuItemOptions[]> {
         const profiles = (await this.profilesService.getProfiles()).filter(x => x.type === 'local') as LocalProfile[]
 
         const items: MenuItemOptions[] = [
             {
-                label: 'New terminal',
+                label: this.translate.instant('New terminal'),
                 click: () => {
                     if (tab instanceof TerminalTabComponent) {
                         this.profilesService.openNewTabForProfile(tab.profile)
@@ -82,7 +84,7 @@ export class NewTabContextMenu extends TabContextMenuItemProvider {
                 },
             },
             {
-                label: 'New with profile',
+                label: this.translate.instant('New with profile'),
                 submenu: profiles.map(profile => ({
                     label: profile.name,
                     click: async () => {
@@ -98,7 +100,7 @@ export class NewTabContextMenu extends TabContextMenuItemProvider {
 
         if (this.uac.isAvailable) {
             items.push({
-                label: 'New admin tab',
+                label: this.translate.instant('New admin tab'),
                 submenu: profiles.map(profile => ({
                     label: profile.name,
                     click: () => {
@@ -116,7 +118,7 @@ export class NewTabContextMenu extends TabContextMenuItemProvider {
 
         if (tab instanceof TerminalTabComponent && tabHeader && this.uac.isAvailable) {
             items.push({
-                label: 'Duplicate as administrator',
+                label: this.translate.instant('Duplicate as administrator'),
                 click: () => {
                     this.profilesService.openNewTabForProfile({
                         ...tab.profile,
@@ -125,15 +127,6 @@ export class NewTabContextMenu extends TabContextMenuItemProvider {
                             runAsAdministrator: true,
                         },
                     })
-                },
-            })
-        }
-
-        if (tab instanceof TerminalTabComponent && tab.parent instanceof SplitTabComponent && tab.parent.getAllTabs().length > 1) {
-            items.push({
-                label: 'Focus all panes',
-                click: () => {
-                    tab.focusAllPanes()
                 },
             })
         }

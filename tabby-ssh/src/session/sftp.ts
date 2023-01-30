@@ -123,6 +123,11 @@ export class SFTPSession {
         await promisify((f: any) => this.sftp.rmdir(p, f))()
     }
 
+    async mkdir (p: string): Promise<void> {
+        this.logger.debug('mkdir', p)
+        await promisify((f: any) => this.sftp.mkdir(p, f))()
+    }
+
     async rename (oldPath: string, newPath: string): Promise<void> {
         this.logger.debug('rename', oldPath, newPath)
         await promisify((f: any) => this.sftp.rename(oldPath, newPath, f))()
@@ -131,6 +136,11 @@ export class SFTPSession {
     async unlink (p: string): Promise<void> {
         this.logger.debug('unlink', p)
         await promisify((f: any) => this.sftp.unlink(p, f))()
+    }
+
+    async chmod (p: string, mode: string|number): Promise<void> {
+        this.logger.debug('chmod', p, mode)
+        await promisify((f: any) => this.sftp.chmod(p, mode, f))()
     }
 
     async upload (path: string, transfer: FileUpload): Promise<void> {

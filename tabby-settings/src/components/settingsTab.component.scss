@@ -2,11 +2,30 @@
     display: flex;
     flex: auto;
     flex-direction: column;
+    min-width: 0;
 
     >.btn-block {
         margin: 20px;
         width: auto;
         flex: none;
+    }
+
+    .logo-area {
+        .tabby-logo {
+            margin: 0 0 0 -8px;
+            width: 60px;
+            height: 60px;
+        }
+
+        .tabby-title {
+            text-align: left;
+        }
+    }
+
+    .link-card {
+        display: flex;
+        line-height: 1;
+        align-items: center;
     }
 
     > .content {
@@ -16,7 +35,7 @@
 
         > .nav {
             padding: 20px 10px;
-            width: 212px;
+            width: 222px;
             flex: none;
             overflow-y: auto;
             flex-wrap: nowrap;

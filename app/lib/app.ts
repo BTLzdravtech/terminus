@@ -1,12 +1,12 @@
-import { app, ipcMain, Menu, Tray, shell, screen, globalShortcut, MenuItemConstructorOptions } from 'electron'
-import * as promiseIpc from 'electron-promise-ipc'
+import { app, ipcMain, Menu, Tray, shell, screen, globalShortcut, MenuItemConstructorOptions, WebContents } from 'electron'
+import promiseIpc from 'electron-promise-ipc'
 import * as remote from '@electron/remote/main'
 import { exec } from 'mz/child_process'
 import * as path from 'path'
 import * as fs from 'fs'
 import { Subject, throttleTime } from 'rxjs'
 
-import { loadConfig } from './config'
+import { saveConfig } from './config'
 import { Window, WindowOptions } from './window'
 import { pluginManager } from './pluginManager'
 import { PTYManager } from './pty'
@@ -25,13 +25,15 @@ export class Application {
     private quitRequested = false
     userPluginsPath: string
 
-    constructor () {
+    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+    constructor (private configStore: any) {
         remote.initialize()
         this.useBuiltinGraphics()
         this.ptyManager.init(this)
 
-        ipcMain.on('app:config-change', (_event, config) => {
-            this.broadcast('host:config-change', config)
+        ipcMain.handle('app:save-config', async (event, config) => {
+            await saveConfig(config)
+            this.broadcastExcept('host:config-change', event.sender, config)
         })
 
         ipcMain.on('app:register-global-hotkey', (_event, specs) => {
@@ -61,13 +63,16 @@ export class Application {
             }
         })
 
-        const configData = loadConfig()
         if (process.platform === 'linux') {
             app.commandLine.appendSwitch('no-sandbox')
-            if (((configData.appearance || {}).opacity || 1) !== 1) {
+            if ((this.configStore.appearance?.opacity || 1) !== 1) {
                 app.commandLine.appendSwitch('enable-transparent-visuals')
                 app.disableHardwareAcceleration()
             }
+        }
+        if (this.configStore.hacks?.disableGPU) {
+            app.commandLine.appendSwitch('disable-gpu')
+            app.disableHardwareAcceleration()
         }
 
         this.userPluginsPath = path.join(
@@ -82,11 +87,14 @@ export class Application {
         app.commandLine.appendSwitch('disable-http-cache')
         app.commandLine.appendSwitch('max-active-webgl-contexts', '9000')
         app.commandLine.appendSwitch('lang', 'EN')
-        app.allowRendererProcessReuse = false
 
-        for (const flag of configData.flags || [['force_discrete_gpu', '0']]) {
+        for (const flag of this.configStore.flags || [['force_discrete_gpu', '0']]) {
             app.commandLine.appendSwitch(flag[0], flag[1])
         }
+
+        app.on('before-quit', () => {
+            this.quitRequested = true
+        })
 
         app.on('window-all-closed', () => {
             if (this.quitRequested || process.platform !== 'darwin') {
@@ -102,8 +110,11 @@ export class Application {
     }
 
     async newWindow (options?: WindowOptions): Promise<Window> {
-        const window = new Window(this, options)
+        const window = new Window(this, this.configStore, options)
         this.windows.push(window)
+        if (this.windows.length === 1) {
+            window.makeMain()
+        }
         window.visible$.subscribe(visible => {
             if (visible) {
                 this.disableTray()
@@ -113,6 +124,10 @@ export class Application {
         })
         window.closed$.subscribe(() => {
             this.windows = this.windows.filter(x => x !== window)
+            if (!this.windows.some(x => x.isMainWindow)) {
+                this.windows[0]?.makeMain()
+                this.windows[0]?.present()
+            }
         })
         if (process.platform === 'darwin') {
             this.setupMenu()
@@ -122,7 +137,14 @@ export class Application {
     }
 
     onGlobalHotkey (): void {
-        if (this.windows.some(x => x.isFocused() && x.isVisible())) {
+        let isPresent = this.windows.some(x => x.isFocused() && x.isVisible())
+        const isDockedOnTop = this.windows.some(x => x.isDockedOnTop())
+        if (isDockedOnTop) {
+            // if docked and on top, hide even if not focused right now
+            isPresent = this.windows.some(x => x.isVisible())
+        }
+
+        if (isPresent) {
             for (const window of this.windows) {
                 window.hide()
             }
@@ -142,6 +164,14 @@ export class Application {
     broadcast (event: string, ...args: any[]): void {
         for (const window of this.windows) {
             window.send(event, ...args)
+        }
+    }
+
+    broadcastExcept (event: string, except: WebContents, ...args: any[]): void {
+        for (const window of this.windows) {
+            if (window.webContents.id === except.id) {
+                window.send(event, ...args)
+            }
         }
     }
 
@@ -191,11 +221,14 @@ export class Application {
 
     focus (): void {
         for (const window of this.windows) {
-            window.show()
+            window.present()
         }
     }
 
-    handleSecondInstance (argv: string[], cwd: string): void {
+    async handleSecondInstance (argv: string[], cwd: string): Promise<void> {
+        if (!this.windows.length) {
+            await this.newWindow()
+        }
         this.presentAllWindows()
         this.windows[this.windows.length - 1].passCliArguments(argv, cwd, true)
     }

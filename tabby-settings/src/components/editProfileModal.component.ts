@@ -7,8 +7,8 @@ import { ConfigProxy, ConfigService, Profile, ProfileProvider, ProfileSettingsCo
 const iconsData = require('../../../tabby-core/src/icons.json')
 const iconsClassList = Object.keys(iconsData).map(
     icon => iconsData[icon].map(
-        style => `fa${style[0]} fa-${icon}`
-    )
+        style => `fa${style[0]} fa-${icon}`,
+    ),
 ).flat()
 
 /** @hidden */
@@ -24,7 +24,7 @@ export class EditProfileModalComponent<P extends Profile> {
     @ViewChild('placeholder', { read: ViewContainerRef }) placeholder: ViewContainerRef
 
     private _profile: Profile
-    private settingsComponentInstance: ProfileSettingsComponent<P>
+    private settingsComponentInstance?: ProfileSettingsComponent<P>
 
     constructor (
         private injector: Injector,
@@ -36,7 +36,7 @@ export class EditProfileModalComponent<P extends Profile> {
         this.groupNames = [...new Set(
             (config.store.profiles as Profile[])
                 .map(x => x.group)
-                .filter(x => !!x)
+                .filter(x => !!x),
         )].sort() as string[]
     }
 
@@ -46,8 +46,8 @@ export class EditProfileModalComponent<P extends Profile> {
         map((q: string) =>
             TAB_COLORS
                 .filter(x => !q || x.name.toLowerCase().startsWith(q.toLowerCase()))
-                .map(x => x.value)
-        )
+                .map(x => x.value),
+        ),
     )
 
     colorsFormatter = value => {
@@ -76,18 +76,18 @@ export class EditProfileModalComponent<P extends Profile> {
         text$.pipe(
             debounceTime(200),
             distinctUntilChanged(),
-            map(q => this.groupNames.filter(x => !q || x.toLowerCase().includes(q.toLowerCase())))
+            map(q => this.groupNames.filter(x => !q || x.toLowerCase().includes(q.toLowerCase()))),
         )
 
     iconSearch: OperatorFunction<string, string[]> = (text$: Observable<string>) =>
         text$.pipe(
             debounceTime(200),
-            map(term => iconsClassList.filter(v => v.toLowerCase().includes(term.toLowerCase())).slice(0, 10))
+            map(term => iconsClassList.filter(v => v.toLowerCase().includes(term.toLowerCase())).slice(0, 10)),
         )
 
     save () {
         this.profile.group ||= undefined
-        this.settingsComponentInstance.save?.()
+        this.settingsComponentInstance?.save?.()
         this.profile.__cleanup()
         this.modalInstance.close(this._profile)
     }

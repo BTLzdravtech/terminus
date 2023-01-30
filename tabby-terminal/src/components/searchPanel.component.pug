@@ -1,33 +1,37 @@
-input.search-input.form-control(
-    type='text',
-    [(ngModel)]='query',
-    (ngModelChange)='onQueryChange()',
-    [class.text-danger]='notFound',
-    (click)='$event.stopPropagation()',
-    (keyup.enter)='findPrevious()',
-    (keyup.esc)='close.emit()',
-    placeholder='Search...'
-)
+.input-group
+    input.search-input.form-control(
+        type='text',
+        [(ngModel)]='query',
+        (ngModelChange)='onQueryChange()',
+        [class.text-danger]='state.resultCount == 0',
+        (click)='$event.stopPropagation()',
+        (keyup.enter)='findPrevious()',
+        (keyup.esc)='close.emit()',
+        [placeholder]='"Search"|translate'
+    )
+    .input-group-append(*ngIf='state.resultCount > 0')
+        .input-group-text.result-counter {{state.resultIndex + 1}} / {{state.resultCount}}
 
-button.btn.btn-link(
-    (click)='findPrevious()',
-    ngbTooltip='Search up',
-    placement='bottom',
-    [fastHtmlBind]='icons.arrowUp'
-)
+ng-container(*ngIf='state.resultCount > 0')
+    button.btn.btn-link(
+        (click)='findPrevious()',
+        ngbTooltip='Search up',
+        placement='bottom',
+        [fastHtmlBind]='icons.arrowUp'
+    )
 
-button.btn.btn-link(
-    (click)='findNext()',
-    ngbTooltip='Search down',
-    placement='bottom',
-    [fastHtmlBind]='icons.arrowDown'
-)
+    button.btn.btn-link(
+        (click)='findNext()',
+        ngbTooltip='Search down',
+        placement='bottom',
+        [fastHtmlBind]='icons.arrowDown'
+    )
 
 .mr-2
 
 button.btn.btn-link(
     (click)='options.caseSensitive = !options.caseSensitive; saveSearchOptions()',
-    [class.active]='options.caseSensitive',
+    [class.btn-info]='options.caseSensitive',
     ngbTooltip='Case sensitivity',
     placement='bottom',
     [fastHtmlBind]='icons.case'
@@ -35,7 +39,7 @@ button.btn.btn-link(
 
 button.btn.btn-link(
     (click)='options.regex = !options.regex; saveSearchOptions()',
-    [class.active]='options.regex',
+    [class.btn-info]='options.regex',
     ngbTooltip='Regular expression',
     placement='bottom',
     [fastHtmlBind]='icons.regexp'
@@ -43,7 +47,7 @@ button.btn.btn-link(
 
 button.btn.btn-link(
     (click)='options.wholeWord = !options.wholeWord; saveSearchOptions()',
-    [class.active]='options.wholeWord',
+    [class.btn-info]='options.wholeWord',
     ngbTooltip='Whole word',
     placement='bottom',
     [fastHtmlBind]='icons.wholeWord'

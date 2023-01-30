@@ -1,6 +1,6 @@
 import { Observable, Subject } from 'rxjs'
-import { Component, Injectable, ViewChild, ViewContainerRef, EmbeddedViewRef, AfterViewInit, OnDestroy } from '@angular/core'
-import { BaseTabComponent, BaseTabProcess } from './baseTab.component'
+import { Component, Injectable, ViewChild, ViewContainerRef, EmbeddedViewRef, AfterViewInit, OnDestroy, Injector } from '@angular/core'
+import { BaseTabComponent, BaseTabProcess, GetRecoveryTokenOptions } from './baseTab.component'
 import { TabRecoveryProvider, RecoveryToken } from '../api/tabRecovery'
 import { TabsService, NewTabParameters } from '../services/tabs.service'
 import { HotkeysService } from '../services/hotkeys.service'
@@ -8,6 +8,7 @@ import { TabRecoveryService } from '../services/tabRecovery.service'
 
 export type SplitOrientation = 'v' | 'h'
 export type SplitDirection = 'r' | 't' | 'b' | 'l'
+export type ResizeDirection = 'v' | 'h' | 'dv' | 'dh'
 
 /**
  * Describes a horizontal or vertical split row or column
@@ -83,6 +84,18 @@ export class SplitContainer {
     }
 
     /**
+     * Makes all tabs have the same size
+     */
+    equalize (): void {
+        for (const child of this.children) {
+            if (child instanceof SplitContainer) {
+                child.equalize()
+            }
+        }
+        this.ratios.fill(1 / this.ratios.length)
+    }
+
+    /**
      * Gets the left/top side offset for the given element index (between 0 and 1)
      */
     getOffsetRatio (index: number): number {
@@ -93,13 +106,13 @@ export class SplitContainer {
         return s
     }
 
-    async serialize (tabsRecovery: TabRecoveryService): Promise<RecoveryToken> {
+    async serialize (tabsRecovery: TabRecoveryService, options?: GetRecoveryTokenOptions): Promise<RecoveryToken> {
         const children: any[] = []
         for (const child of this.children) {
             if (child instanceof SplitContainer) {
-                children.push(await child.serialize(tabsRecovery))
+                children.push(await child.serialize(tabsRecovery, options))
             } else {
-                children.push(await tabsRecovery.getFullRecoveryToken(child))
+                children.push(await tabsRecovery.getFullRecoveryToken(child, options))
             }
         }
         return {
@@ -155,6 +168,7 @@ export type SplitDropZoneInfo = {
             [container]='spanner.container'
             [index]='spanner.index'
             (change)='onSpannerAdjusted(spanner)'
+            (resizing)='onSpannerResizing($event)'
         ></split-tab-spanner>
         <split-tab-drop-zone
             *ngFor='let dropZone of _dropZones'
@@ -198,6 +212,14 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
     _allFocusMode = false
 
     /** @hidden */
+    _spannerResizing = false
+
+    /**
+     * Disables display of dynamic window/tab title provided by the shell
+     */
+    disableDynamicTitle = false
+
+    /** @hidden */
     private focusedTab: BaseTabComponent|null = null
     private maximizedTab: BaseTabComponent|null = null
     private viewRefs: Map<BaseTabComponent, EmbeddedViewRef<any>> = new Map()
@@ -238,8 +260,9 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
         private hotkeys: HotkeysService,
         private tabsService: TabsService,
         private tabRecovery: TabRecoveryService,
+        injector: Injector,
     ) {
-        super()
+        super(injector)
         this.root = new SplitContainer()
         this.setTitle('')
 
@@ -252,6 +275,9 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
             }
         })
         this.blurred$.subscribe(() => this.getAllTabs().forEach(x => x.emitBlurred()))
+
+        this.tabAdded$.subscribe(() => this.updateTitle())
+        this.tabRemoved$.subscribe(() => this.updateTitle())
 
         this.subscribeUntilDestroyed(this.hotkeys.hotkey$, hotkey => {
             if (!this.hasFocus || !this.focusedTab) {
@@ -288,6 +314,33 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
                 case 'pane-nav-next':
                     this.navigateLinear(1)
                     break
+                case 'pane-nav-1':
+                    this.navigateSpecific(0)
+                    break
+                case 'pane-nav-2':
+                    this.navigateSpecific(1)
+                    break
+                case 'pane-nav-3':
+                    this.navigateSpecific(2)
+                    break
+                case 'pane-nav-4':
+                    this.navigateSpecific(3)
+                    break
+                case 'pane-nav-5':
+                    this.navigateSpecific(4)
+                    break
+                case 'pane-nav-6':
+                    this.navigateSpecific(5)
+                    break
+                case 'pane-nav-7':
+                    this.navigateSpecific(6)
+                    break
+                case 'pane-nav-8':
+                    this.navigateSpecific(7)
+                    break
+                case 'pane-nav-9':
+                    this.navigateSpecific(8)
+                    break
                 case 'pane-maximize':
                     if (this.maximizedTab) {
                         this.maximize(null)
@@ -298,6 +351,18 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
                 case 'close-pane':
                     this.removeTab(this.focusedTab)
                     break
+                case 'pane-increase-vertical':
+                    this.resizePane('v')
+                    break
+                case 'pane-decrease-vertical':
+                    this.resizePane('dv')
+                    break
+                case 'pane-increase-horizontal':
+                    this.resizePane('h')
+                    break
+                case 'pane-decrease-horizontal':
+                    this.resizePane('dh')
+                    break
             }
         })
     }
@@ -305,7 +370,8 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
     /** @hidden */
     async ngAfterViewInit (): Promise<void> {
         if (this._recoveredState) {
-            await this.recoverContainer(this.root, this._recoveredState, this._recoveredState.duplicate)
+            await this.recoverContainer(this.root, this._recoveredState)
+            this.updateTitle()
             this.layout()
             setTimeout(() => {
                 if (this.hasFocus) {
@@ -445,6 +511,8 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
             this.attachTabView(tab)
             this.onAfterTabAdded(tab)
         }
+
+        this.root.normalize()
     }
 
     removeTab (tab: BaseTabComponent): void {
@@ -487,6 +555,113 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
     }
 
     /**
+      * Changes the size of the focused pane in the given direction
+      */
+    resizePane (direction: ResizeDirection): void {
+        const resizeStep = this.config.store.terminal.paneResizeStep
+
+        // The direction of the resize pane, vertically or horizontally
+        let directionvh: SplitOrientation = 'h'
+
+        const isDecreasing: boolean = direction === 'dv' || direction === 'dh'
+
+        if (direction === 'dh') {
+            directionvh = 'h'
+        }
+        if (direction === 'dv') {
+            directionvh = 'v'
+        }
+        if (direction === 'h') {
+            directionvh = 'h'
+        }
+        if (direction === 'v') {
+            directionvh = 'v'
+        }
+        if (!this.focusedTab) {
+            console.debug('No currently focused tab')
+            return
+        }
+
+        let currentContainer: BaseTabComponent | SplitContainer = this.focusedTab
+        let child: BaseTabComponent | SplitContainer | null = this.focusedTab
+        let curSplitOrientation: SplitOrientation | null = null
+
+        // Find the first split that is in the orientations that the user chooses to change
+        while (curSplitOrientation !== directionvh) {
+            const parentContainer = this.getParentOf(currentContainer)
+            if (!parentContainer) {
+                return
+            }
+            child = currentContainer
+            currentContainer = parentContainer
+            if (currentContainer instanceof SplitContainer) {
+                curSplitOrientation = currentContainer.orientation
+            }
+        }
+
+        if (!(currentContainer instanceof SplitContainer)) {
+            return
+        }
+
+        // Determine which index in the ratios refers to the child that will be modified
+        const currentChildIndex = currentContainer.children.indexOf(child)
+
+        let updatedRatio = 0
+        if (isDecreasing) {
+            updatedRatio = currentContainer.ratios[currentChildIndex] - resizeStep
+            if (updatedRatio < 0) {
+                return
+            }
+        } else {
+            updatedRatio = currentContainer.ratios[currentChildIndex] + resizeStep
+            if (updatedRatio > 1) {
+                return
+            }
+        }
+
+        currentContainer.ratios[currentChildIndex] = updatedRatio
+        this.layout()
+    }
+
+    private getPaneRect (pane: BaseTabComponent): DOMRect {
+        const viewRef = this.viewRefs.get(pane)!
+        const element = viewRef.rootNodes[0] as HTMLElement
+        return element.getBoundingClientRect()
+    }
+
+    getNearestPaneInDirection (from: BaseTabComponent, direction: SplitDirection): BaseTabComponent {
+        const rect = this.getPaneRect(from)
+
+        let nearest: BaseTabComponent | null = null
+        let nearestDistance = Infinity
+
+        let panes = this.getAllTabs().map(pane => ({ pane, rect: this.getPaneRect(pane) }))
+
+        if (direction === 'l') {
+            panes = panes.filter(pane => pane.rect.right <= rect.left)
+        } else if (direction === 'r') {
+            panes = panes.filter(pane => pane.rect.left >= rect.right)
+        } else if (direction === 't') {
+            panes = panes.filter(pane => pane.rect.bottom <= rect.top)
+        } else {
+            panes = panes.filter(pane => pane.rect.top >= rect.bottom)
+        }
+
+        for (const pane of panes) {
+            if (pane.pane === from) {
+                continue
+            }
+            const distance = Math.abs(rect.left + rect.width / 2 - pane.rect.left - pane.rect.width / 2) + Math.abs(rect.top + rect.height / 2 - pane.rect.top - pane.rect.height / 2)
+            if (distance < nearestDistance) {
+                nearest = pane.pane
+                nearestDistance = distance
+            }
+        }
+
+        return nearest ?? from
+    }
+
+    /**
      * Moves focus in the given direction
      */
     navigate (dir: SplitDirection): void {
@@ -494,36 +669,7 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
             return
         }
 
-        let rel: BaseTabComponent | SplitContainer = this.focusedTab
-        let parent = this.getParentOf(rel)
-        if (!parent) {
-            return
-        }
-
-        const orientation = ['l', 'r'].includes(dir) ? 'h' : 'v'
-
-        while (parent !== this.root && parent.orientation !== orientation) {
-            rel = parent
-            parent = this.getParentOf(rel)
-            if (!parent) {
-                return
-            }
-        }
-
-        if (parent.orientation !== orientation) {
-            return
-        }
-
-        const index = parent.children.indexOf(rel)
-        if (['l', 't'].includes(dir)) {
-            if (index > 0) {
-                this.focusAnyIn(parent.children[index - 1])
-            }
-        } else {
-            if (index < parent.children.length - 1) {
-                this.focusAnyIn(parent.children[index + 1])
-            }
-        }
+        this.focus(this.getNearestPaneInDirection(this.focusedTab, dir))
     }
 
     navigateLinear (delta: number): void {
@@ -535,6 +681,15 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
         const all = this.getAllTabs()
         const target = all[(all.indexOf(relativeTo) + delta + all.length) % all.length]
         this.focus(target)
+    }
+
+    navigateSpecific (target: number): void {
+        const all = this.getAllTabs()
+        if (target >= all.length) {
+            return
+        }
+
+        this.focus(all[target])
     }
 
     async splitTab (tab: BaseTabComponent, dir: SplitDirection): Promise<BaseTabComponent|null> {
@@ -570,8 +725,8 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
     }
 
     /** @hidden */
-    async getRecoveryToken (): Promise<any> {
-        return this.root.serialize(this.tabRecovery)
+    async getRecoveryToken (options?: GetRecoveryTokenOptions): Promise<any> {
+        return this.root.serialize(this.tabRecovery, options)
     }
 
     /** @hidden */
@@ -583,6 +738,11 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
     onSpannerAdjusted (spanner: SplitSpannerInfo): void {
         this.layout()
         this.splitAdjusted.next(spanner)
+    }
+
+    /** @hidden */
+    onSpannerResizing (state: boolean): void {
+        this._spannerResizing = state
     }
 
     /** @hidden */
@@ -620,14 +780,50 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
         super.clearActivity()
     }
 
+    get icon (): string|null {
+        return this.getFocusedTab()?.icon ?? null
+    }
+
+    set icon (icon: string|null) {
+        for (const t of this.getAllTabs()) {
+            t.icon = icon
+        }
+    }
+
+    get color (): string|null {
+        return this.getFocusedTab()?.color ?? null
+    }
+
+    set color (color: string|null) {
+        for (const t of this.getAllTabs()) {
+            t.color = color
+        }
+    }
+
+    equalize (): void {
+        this.root.normalize()
+        this.root.equalize()
+    }
+
     private updateTitle (): void {
-        this.setTitle(this.getAllTabs().map(x => x.title).join(' | '))
+        if (this.disableDynamicTitle) {
+            return
+        }
+        this.setTitle([...new Set(this.getAllTabs().map(x => x.title))].join(' | '))
     }
 
     private attachTabView (tab: BaseTabComponent) {
         const ref = tab.insertIntoContainer(this.viewContainer)
         this.viewRefs.set(tab, ref)
         tab.addEventListenerUntilDestroyed(ref.rootNodes[0], 'click', () => this.focus(tab))
+        if (this.config.store.terminal.focusFollowsMouse) {
+            tab.addEventListenerUntilDestroyed(ref.rootNodes[0], 'mousemove', () => {
+                if (this._spannerResizing) {
+                    return
+                }
+                this.focus(tab)
+            })
+        }
 
         tab.subscribeUntilDestroyed(tab.titleChange$, () => this.updateTitle())
         tab.subscribeUntilDestroyed(tab.activity$, a => a ? this.displayActivity() : this.clearActivity())
@@ -791,7 +987,7 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
         })
     }
 
-    private async recoverContainer (root: SplitContainer, state: any, duplicate = false) {
+    private async recoverContainer (root: SplitContainer, state: any) {
         const children: (SplitContainer | BaseTabComponent)[] = []
         root.orientation = state.orientation
         root.ratios = state.ratios
@@ -802,10 +998,10 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
             }
             if (childState.type === 'app:split-tab') {
                 const child = new SplitContainer()
-                await this.recoverContainer(child, childState, duplicate)
+                await this.recoverContainer(child, childState)
                 children.push(child)
             } else {
-                const recovered = await this.tabRecovery.recoverTab(childState, duplicate)
+                const recovered = await this.tabRecovery.recoverTab(childState)
                 if (recovered) {
                     const tab = this.tabsService.create(recovered)
                     children.push(tab)
@@ -834,13 +1030,6 @@ export class SplitTabRecoveryProvider extends TabRecoveryProvider<SplitTabCompon
         return {
             type: SplitTabComponent,
             inputs: { _recoveredState: recoveryToken },
-        }
-    }
-
-    duplicate (recoveryToken: RecoveryToken): RecoveryToken {
-        return {
-            ...recoveryToken,
-            duplicate: true,
         }
     }
 }

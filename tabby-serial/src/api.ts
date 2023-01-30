@@ -1,9 +1,9 @@
 import stripAnsi from 'strip-ansi'
-import SerialPort from 'serialport'
+import { SerialPortStream } from '@serialport/stream'
 import { LogService, NotificationsService, Profile } from 'tabby-core'
 import { Subject, Observable } from 'rxjs'
 import { Injector, NgZone } from '@angular/core'
-import { BaseSession, LoginScriptsOptions, StreamProcessingOptions, TerminalStreamProcessor } from 'tabby-terminal'
+import { BaseSession, LoginScriptsOptions, SessionMiddleware, StreamProcessingOptions, TerminalStreamProcessor } from 'tabby-terminal'
 import { SerialService } from './services/serial.service'
 
 export interface SerialProfile extends Profile {
@@ -20,6 +20,7 @@ export interface SerialProfileOptions extends StreamProcessingOptions, LoginScri
     xon?: boolean
     xoff?: boolean
     xany?: boolean
+    slowSend?: boolean
 }
 
 export const BAUD_RATES = [
@@ -31,8 +32,16 @@ export interface SerialPortInfo {
     description?: string
 }
 
+class SlowFeedMiddleware extends SessionMiddleware {
+    feedFromTerminal (data: Buffer): void {
+        for (const byte of data) {
+            this.outputToSession.next(Buffer.from([byte]))
+        }
+    }
+}
+
 export class SerialSession extends BaseSession {
-    serial: SerialPort
+    serial: SerialPortStream|null
 
     get serviceMessage$ (): Observable<string> { return this.serviceMessage }
     private serviceMessage = new Subject<string>()
@@ -49,13 +58,11 @@ export class SerialSession extends BaseSession {
         this.notifications = injector.get(NotificationsService)
 
         this.streamProcessor = new TerminalStreamProcessor(profile.options)
-        this.streamProcessor.outputToSession$.subscribe(data => {
-            this.serial?.write(data.toString())
-        })
-        this.streamProcessor.outputToTerminal$.subscribe(data => {
-            this.emitOutput(data)
-            this.loginScriptProcessor?.feedFromSession(data)
-        })
+        this.middleware.push(this.streamProcessor)
+
+        if (this.profile.options.slowSend) {
+            this.middleware.unshift(new SlowFeedMiddleware())
+        }
 
         this.setLoginScriptsOptions(profile.options)
     }
@@ -65,11 +72,13 @@ export class SerialSession extends BaseSession {
             this.profile.options.port = (await this.serialService.listPorts())[0].name
         }
 
-        this.serial = new SerialPort(this.profile.options.port, {
+        const serial = this.serial = new SerialPortStream({
+            binding: this.serialService.detectBinding(),
+            path: this.profile.options.port,
             autoOpen: false,
             baudRate: parseInt(this.profile.options.baudrate as any),
-            dataBits: this.profile.options.databits ?? 8,
-            stopBits: this.profile.options.stopbits ?? 1,
+            dataBits: this.profile.options.databits ?? 8 as any,
+            stopBits: this.profile.options.stopbits ?? 1 as any,
             parity: this.profile.options.parity ?? 'none',
             rtscts: this.profile.options.rtscts ?? false,
             xon: this.profile.options.xon ?? false,
@@ -78,27 +87,27 @@ export class SerialSession extends BaseSession {
         })
         let connected = false
         await new Promise(async (resolve, reject) => {
-            this.serial.on('open', () => {
+            serial.on('open', () => {
                 connected = true
                 this.zone.run(resolve)
             })
-            this.serial.on('error', error => {
+            serial.on('error', error => {
                 this.zone.run(() => {
                     if (connected) {
-                        this.notifications.error(error.toString())
+                        this.notifications.error(error.message)
                     } else {
                         reject(error)
                     }
                     this.destroy()
                 })
             })
-            this.serial.on('close', () => {
+            serial.on('close', () => {
                 this.emitServiceMessage('Port closed')
                 this.destroy()
             })
 
             try {
-                this.serial.open()
+                serial.open()
             } catch (e) {
                 this.notifications.error(e.message)
                 reject(e)
@@ -108,11 +117,11 @@ export class SerialSession extends BaseSession {
         this.open = true
         setTimeout(() => this.streamProcessor.start())
 
-        this.serial.on('readable', () => {
-            this.streamProcessor.feedFromSession(this.serial.read())
+        serial.on('readable', () => {
+            this.emitOutput(serial.read())
         })
 
-        this.serial.on('end', () => {
+        serial.on('end', () => {
             this.logger.info('Shell session ended')
             if (this.open) {
                 this.destroy()
@@ -123,11 +132,10 @@ export class SerialSession extends BaseSession {
     }
 
     write (data: Buffer): void {
-        this.streamProcessor.feedFromTerminal(data)
+        this.serial?.write(data.toString())
     }
 
     async destroy (): Promise<void> {
-        this.streamProcessor.close()
         this.serviceMessage.complete()
         await super.destroy()
     }
@@ -138,7 +146,7 @@ export class SerialSession extends BaseSession {
     }
 
     kill (_?: string): void {
-        this.serial.close()
+        this.serial?.close()
     }
 
     emitServiceMessage (msg: string): void {

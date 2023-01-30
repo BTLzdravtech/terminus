@@ -1,5 +1,6 @@
 import * as psNode from 'ps-node'
 import * as fs from 'mz/fs'
+import * as fsSync from 'fs'
 import { Injector } from '@angular/core'
 import { HostAppService, ConfigService, WIN_BUILD_CONPTY_SUPPORTED, isWindowsBuild, Platform, BootstrapData, BOOTSTRAP_DATA, LogService } from 'tabby-core'
 import { BaseSession } from 'tabby-terminal'
@@ -140,6 +141,7 @@ export class Session extends BaseSession {
             let env = mergeEnv(
                 process.env,
                 {
+                    COLORTERM: 'truecolor',
                     TERM: 'xterm-256color',
                     TERM_PROGRAM: 'Tabby',
                 },
@@ -168,7 +170,7 @@ export class Session extends BaseSession {
             // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
             let cwd = options.cwd || process.env.HOME
 
-            if (!fs.existsSync(cwd)) {
+            if (!fsSync.existsSync(cwd!)) {
                 console.warn('Ignoring non-existent CWD:', cwd)
                 cwd = undefined
             }
@@ -295,18 +297,16 @@ export class Session extends BaseSession {
         } else {
             await new Promise<void>((resolve) => {
                 this.kill('SIGTERM')
-                setImmediate(() => {
+                setTimeout(() => {
                     try {
                         process.kill(this.pty!.getPID(), 0)
                         // still alive
-                        setTimeout(() => {
-                            this.kill('SIGKILL')
-                            resolve()
-                        }, 1000)
+                        this.kill('SIGKILL')
+                        resolve()
                     } catch {
                         resolve()
                     }
-                })
+                }, 500)
             })
         }
     }

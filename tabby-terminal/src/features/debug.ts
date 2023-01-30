@@ -16,12 +16,17 @@ export class DebugDecorator extends TerminalDecorator {
         let sessionOutputBuffer = ''
         const bufferLength = 8192
 
-        this.subscribeUntilDetached(terminal, terminal.session!.output$.subscribe(data => {
+        const handler = data => {
             sessionOutputBuffer += data
             if (sessionOutputBuffer.length > bufferLength) {
                 sessionOutputBuffer = sessionOutputBuffer.substring(sessionOutputBuffer.length - bufferLength)
             }
+        }
+        this.subscribeUntilDetached(terminal, terminal.sessionChanged$.subscribe(session => {
+            this.subscribeUntilDetached(terminal, session?.output$.subscribe(handler))
         }))
+
+        this.subscribeUntilDetached(terminal, terminal.session?.output$.subscribe(handler))
 
         terminal.addEventListenerUntilDestroyed(terminal.content.nativeElement, 'keyup', (e: KeyboardEvent) => {
             // Ctrl-Shift-Alt-1
@@ -116,7 +121,7 @@ export class DebugDecorator extends TerminalDecorator {
     private async doLoadOutput (terminal: BaseTerminalTabComponent) {
         const data = await this.loadFile()
         if (data) {
-            terminal.frontend?.write(data)
+            await terminal.frontend?.write(data)
         }
     }
 
@@ -126,7 +131,7 @@ export class DebugDecorator extends TerminalDecorator {
             if (data.startsWith('`')) {
                 data = data.substring(3, data.length - 3)
             }
-            terminal.frontend?.write(JSON.parse(data))
+            await terminal.frontend?.write(JSON.parse(data))
         }
     }
 }

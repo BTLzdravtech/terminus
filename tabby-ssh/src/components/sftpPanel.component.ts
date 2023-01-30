@@ -1,10 +1,12 @@
 import * as C from 'constants'
 import { posix as path } from 'path'
 import { Component, Input, Output, EventEmitter, Inject, Optional } from '@angular/core'
-import { FileUpload, MenuItemOptions, PlatformService } from 'tabby-core'
+import { FileUpload, MenuItemOptions, NotificationsService, PlatformService } from 'tabby-core'
 import { SFTPSession, SFTPFile } from '../session/sftp'
 import { SSHSession } from '../session/ssh'
 import { SFTPContextMenuItemProvider } from '../api'
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
+import { SFTPCreateDirectoryModalComponent } from './sftpCreateDirectoryModal.component'
 
 interface PathSegment {
     name: string
@@ -24,9 +26,13 @@ export class SFTPPanelComponent {
     @Input() path = '/'
     @Output() pathChange = new EventEmitter<string>()
     pathSegments: PathSegment[] = []
+    @Input() cwdDetectionAvailable = false
+    editingPath: string|null = null
 
     constructor (
-        private platform: PlatformService,
+        private ngbModal: NgbModal,
+        private notifications: NotificationsService,
+        public platform: PlatformService,
         @Optional() @Inject(SFTPContextMenuItemProvider) protected contextMenuProviders: SFTPContextMenuItemProvider[],
     ) {
         this.contextMenuProviders.sort((a, b) => a.weight - b.weight)
@@ -38,11 +44,13 @@ export class SFTPPanelComponent {
             await this.navigate(this.path)
         } catch (error) {
             console.warn('Could not navigate to', this.path, ':', error)
+            this.notifications.error(error.message)
             await this.navigate('/')
         }
     }
 
-    async navigate (newPath: string): Promise<void> {
+    async navigate (newPath: string, fallbackOnError = true): Promise<void> {
+        const previousPath = this.path
         this.path = newPath
         this.pathChange.next(this.path)
 
@@ -57,7 +65,15 @@ export class SFTPPanelComponent {
         }
 
         this.fileList = null
-        this.fileList = await this.sftp.readdir(this.path)
+        try {
+            this.fileList = await this.sftp.readdir(this.path)
+        } catch (error) {
+            this.notifications.error(error.message)
+            if (previousPath && fallbackOnError) {
+                this.navigate(previousPath, false)
+            }
+            return
+        }
 
         const dirKey = a => a.isDirectory ? 1 : 0
         this.fileList.sort((a, b) =>
@@ -95,14 +111,27 @@ export class SFTPPanelComponent {
         }
     }
 
+    async openCreateDirectoryModal (): Promise<void> {
+        const modal = this.ngbModal.open(SFTPCreateDirectoryModalComponent)
+        const directoryName = await modal.result
+        if (directoryName !== '') {
+            this.sftp.mkdir(path.join(this.path, directoryName)).then(() => {
+                this.notifications.notice('The directory was created successfully')
+                this.navigate(path.join(this.path, directoryName))
+            }).catch(() => {
+                this.notifications.error('The directory could not be created')
+            })
+        }
+    }
+
     async upload (): Promise<void> {
         const transfers = await this.platform.startUpload({ multiple: true })
         await Promise.all(transfers.map(t => this.uploadOne(t)))
     }
 
     async uploadOne (transfer: FileUpload): Promise<void> {
-        await this.sftp.upload(path.join(this.path, transfer.getName()), transfer)
         const savedPath = this.path
+        await this.sftp.upload(path.join(this.path, transfer.getName()), transfer)
         if (this.path === savedPath) {
             await this.navigate(this.path)
         }
@@ -144,6 +173,26 @@ export class SFTPPanelComponent {
     async showContextMenu (item: SFTPFile, event: MouseEvent): Promise<void> {
         event.preventDefault()
         this.platform.popupContextMenu(await this.buildContextMenu(item), event)
+    }
+
+    get shouldShowCWDTip (): boolean {
+        return !window.localStorage.sshCWDTipDismissed
+    }
+
+    dismissCWDTip (): void {
+        window.localStorage.sshCWDTipDismissed = 'true'
+    }
+
+    editPath (): void {
+        this.editingPath = this.path
+    }
+
+    confirmPath (): void {
+        if (this.editingPath === null) {
+            return
+        }
+        this.navigate(this.editingPath)
+        this.editingPath = null
     }
 
     close (): void {

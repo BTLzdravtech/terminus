@@ -1,4 +1,5 @@
 import { Injectable, Inject } from '@angular/core'
+import { TranslateService } from '@ngx-translate/core'
 import { NewTabParameters } from './tabs.service'
 import { BaseTabComponent } from '../components/baseTab.component'
 import { PartialProfile, Profile, ProfileProvider } from '../api/profileProvider'
@@ -29,15 +30,14 @@ export class ProfilesService {
         private config: ConfigService,
         private notifications: NotificationsService,
         private selector: SelectorService,
+        private translate: TranslateService,
         @Inject(ProfileProvider) private profileProviders: ProfileProvider<Profile>[],
     ) { }
 
     async openNewTabForProfile <P extends Profile> (profile: PartialProfile<P>): Promise<BaseTabComponent|null> {
         const params = await this.newTabParametersForProfile(profile)
         if (params) {
-            const tab = this.app.openNewTab(params)
-            ;(this.app.getParentTab(tab) ?? tab).color = profile.color ?? null
-            return tab
+            return this.app.openNewTab(params)
         }
         return null
     }
@@ -48,8 +48,14 @@ export class ProfilesService {
         if (params) {
             params.inputs ??= {}
             params.inputs['title'] = profile.name
-            if (profile.disableDynamicTitle) {
+            if (fullProfile.disableDynamicTitle) {
                 params.inputs['disableDynamicTitle'] = true
+            }
+            if (fullProfile.color) {
+                params.inputs['color'] = fullProfile.color
+            }
+            if (fullProfile.icon) {
+                params.inputs['icon'] = fullProfile.icon
             }
         }
         return params
@@ -84,9 +90,12 @@ export class ProfilesService {
 
     selectorOptionForProfile <P extends Profile, T> (profile: PartialProfile<P>): SelectorOption<T> {
         const fullProfile = this.getConfigProxyForProfile(profile)
+        const provider = this.providerForProfile(fullProfile)
+        const freeInputEquivalent = provider?.intoQuickConnectString(fullProfile) ?? undefined
         return {
             ...profile,
-            description: this.providerForProfile(fullProfile)?.getDescription(fullProfile),
+            freeInputEquivalent,
+            description: provider?.getDescription(fullProfile),
         }
     }
 
@@ -97,15 +106,20 @@ export class ProfilesService {
     }
 
     showProfileSelector (): Promise<PartialProfile<Profile>|null> {
+        if (this.selector.active) {
+            return Promise.resolve(null)
+        }
+
         return new Promise<PartialProfile<Profile>|null>(async (resolve, reject) => {
             try {
                 const recentProfiles = this.getRecentProfiles()
 
                 let options: SelectorOption<void>[] = recentProfiles.map(p => ({
                     ...this.selectorOptionForProfile(p),
-                    group: 'Recent',
+                    group: this.translate.instant('Recent'),
                     icon: 'fas fa-history',
                     color: p.color,
+                    weight: -2,
                     callback: async () => {
                         if (p.id) {
                             p = (await this.getProfiles()).find(x => x.id === p.id) ?? p
@@ -115,9 +129,10 @@ export class ProfilesService {
                 }))
                 if (recentProfiles.length) {
                     options.push({
-                        name: 'Clear recent profiles',
-                        group: 'Recent',
+                        name: this.translate.instant('Clear recent profiles'),
+                        group: this.translate.instant('Recent'),
                         icon: 'fas fa-eraser',
+                        weight: -1,
                         callback: async () => {
                             window.localStorage.removeItem('recentProfiles')
                             this.config.save()
@@ -136,14 +151,16 @@ export class ProfilesService {
 
                 options = [...options, ...profiles.map((p): SelectorOption<void> => ({
                     ...this.selectorOptionForProfile(p),
+                    weight: p.isBuiltin ? 2 : 1,
                     callback: () => resolve(p),
                 }))]
 
                 try {
                     const { SettingsTabComponent } = window['nodeRequire']('tabby-settings')
                     options.push({
-                        name: 'Manage profiles',
+                        name: this.translate.instant('Manage profiles'),
                         icon: 'fas fa-window-restore',
+                        weight: 10,
                         callback: () => {
                             this.app.openNewTabRaw({
                                 type: SettingsTabComponent,
@@ -156,8 +173,8 @@ export class ProfilesService {
 
                 if (this.getProviders().some(x => x.supportsQuickConnect)) {
                     options.push({
-                        name: 'Quick connect',
-                        freeInputPattern: 'Connect to "%s"...',
+                        name: this.translate.instant('Quick connect'),
+                        freeInputPattern: this.translate.instant('Connect to "%s"...'),
                         icon: 'fas fa-arrow-right',
                         callback: query => {
                             const profile = this.quickConnect(query)
@@ -165,7 +182,7 @@ export class ProfilesService {
                         },
                     })
                 }
-                await this.selector.show('Select profile or enter an address', options)
+                await this.selector.show(this.translate.instant('Select profile or enter an address'), options)
             } catch (err) {
                 reject(err)
             }

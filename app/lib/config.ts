@@ -2,6 +2,8 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as yaml from 'js-yaml'
 import { app } from 'electron'
+import { writeFile } from 'atomically'
+
 
 export function migrateConfig (): void {
     const configPath = path.join(app.getPath('userData'), 'config.yaml')
@@ -23,4 +25,11 @@ export function loadConfig (): any {
     } else {
         return {}
     }
+}
+
+const configPath = path.join(app.getPath('userData'), 'config.yaml')
+
+export async function saveConfig (content: string): Promise<void> {
+    await writeFile(configPath, content, { encoding: 'utf8' })
+    await writeFile(configPath + '.backup', content, { encoding: 'utf8' })
 }

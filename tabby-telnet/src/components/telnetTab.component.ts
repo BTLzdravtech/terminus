@@ -1,7 +1,8 @@
+import { marker as _ } from '@biesbjerg/ngx-translate-extract-marker'
 import colors from 'ansi-colors'
 import { Component, Injector } from '@angular/core'
 import { first } from 'rxjs'
-import { Platform, RecoveryToken } from 'tabby-core'
+import { GetRecoveryTokenOptions, Platform, RecoveryToken } from 'tabby-core'
 import { BaseTerminalTabComponent } from 'tabby-terminal'
 import { TelnetProfile, TelnetSession } from '../session'
 
@@ -54,7 +55,7 @@ export class TelnetTabComponent extends BaseTerminalTabComponent {
                 // Session was closed abruptly
                 if (!this.reconnectOffered) {
                     this.reconnectOffered = true
-                    this.write('Press any key to reconnect\r\n')
+                    this.write(this.translate.instant(_('Press any key to reconnect')) + '\r\n')
                     this.input$.pipe(first()).subscribe(() => {
                         if (!this.session?.open && this.reconnectOffered) {
                             this.reconnect()
@@ -77,7 +78,7 @@ export class TelnetTabComponent extends BaseTerminalTabComponent {
         this.setSession(session)
 
         try {
-            this.startSpinner('Connecting')
+            this.startSpinner(this.translate.instant(_('Connecting')))
 
             this.attachSessionHandler(session.serviceMessage$, msg => {
                 this.write(`\r${colors.black.bgWhite(' Telnet ')} ${msg}\r\n`)
@@ -97,11 +98,11 @@ export class TelnetTabComponent extends BaseTerminalTabComponent {
         }
     }
 
-    async getRecoveryToken (): Promise<RecoveryToken> {
+    async getRecoveryToken (options?: GetRecoveryTokenOptions): Promise<RecoveryToken> {
         return {
             type: 'app:telnet-tab',
             profile: this.profile,
-            savedState: this.frontend?.saveState(),
+            savedState: options?.includeState && this.frontend?.saveState(),
         }
     }
 
@@ -118,11 +119,14 @@ export class TelnetTabComponent extends BaseTerminalTabComponent {
         return (await this.platform.showMessageBox(
             {
                 type: 'warning',
-                message: `Disconnect from ${this.profile?.options.host}?`,
-                buttons: ['Disconnect', 'Do not close'],
+                message: this.translate.instant(_('Disconnect from {host}?'), this.profile?.options),
+                buttons: [
+                    this.translate.instant(_('Disconnect')),
+                    this.translate.instant(_('Do not close')),
+                ],
                 defaultId: 0,
                 cancelId: 1,
-            }
+            },
         )).response === 0
     }
 }
