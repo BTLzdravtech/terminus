@@ -12,7 +12,7 @@ export class CommandService {
         private app: AppService,
         private translate: TranslateService,
         @Optional() @Inject(TabContextMenuItemProvider) protected contextMenuProviders: TabContextMenuItemProvider[],
-        @Inject(ToolbarButtonProvider) private toolbarButtonProviders: ToolbarButtonProvider[],
+        @Optional() @Inject(ToolbarButtonProvider) private toolbarButtonProviders: ToolbarButtonProvider[],
         @Inject(CommandProvider) private commandProviders: CommandProvider[],
     ) {
         this.contextMenuProviders.sort((a, b) => a.weight - b.weight)
@@ -71,6 +71,7 @@ export class CommandService {
         }
 
         return commands
+            .filter(c => !this.config.store.commandBlacklist.includes(c.id))
             .sort((a, b) => (a.weight ?? 0) - (b.weight ?? 0))
             .map(command => {
                 const run = command.run
@@ -100,7 +101,7 @@ export class CommandService {
             context.tab = tab.getFocusedTab() ?? undefined
         }
         const commands = await this.getCommands(context)
-        await this.selector.show(
+        return this.selector.show(
             this.translate.instant('Commands'),
             commands.map(c => ({
                 name: c.label,

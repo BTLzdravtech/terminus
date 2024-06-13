@@ -17,13 +17,13 @@ First, from within the `tabby` directory install the dependencies via yarn:
 yarn
 ```
 
-**Note: For compiling for Linux armv7l, you need to downgrade electron to 17.0.0 in package.json present in root directory of tabby source**
-
 ```
 # Linux (Debian/Ubuntu here as an example)
 sudo apt install libfontconfig-dev libsecret-1-dev libarchive-tools libnss3 libatk1.0-0 libatk-bridge2.0-0 libgdk-pixbuf2.0-0 libgtk-3-0 libgbm1 cmake
 yarn
 ```
+
+_⚠️Note: If you forked this repository, you may need to pull down the tags from this repository before installing node modules. `git pull --tags upstream master`_
 
 Build Tabby:
 
@@ -42,13 +42,13 @@ yarn start
 To build an installer, first complete a "normal" build as described above and then run:
 
 ```
-node scripts/prepackage-plugins.js
+node scripts/prepackage-plugins.mjs
 
-node scripts/build-windows.js
+node scripts/build-windows.mjs
 # or
-node scripts/build-linux.js
+node scripts/build-linux.mjs
 # or
-node scripts/build-macos.js
+node scripts/build-macos.mjs
 ```
 
 The artifacts will be produced in the `dist` folder.

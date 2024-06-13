@@ -10,6 +10,8 @@ import { ElectronService } from '../services/electron.service'
 import { ElectronHostWindow } from './hostWindow.service'
 import { ShellIntegrationService } from './shellIntegration.service'
 import { ElectronHostAppService } from './hostApp.service'
+import { PlatformTheme } from '../../../tabby-core/src/api/platform'
+import { configPath } from '../../../app/lib/config'
 const fontManager = require('fontmanager-redux') // eslint-disable-line
 
 /* eslint-disable block-scoped-var */
@@ -35,10 +37,14 @@ export class ElectronPlatformService extends PlatformService {
         private translate: TranslateService,
     ) {
         super()
-        this.configPath = path.join(electron.app.getPath('userData'), 'config.yaml')
+        this.configPath = configPath
 
         electron.ipcRenderer.on('host:display-metrics-changed', () => {
             this.zone.run(() => this.displayMetricsChanged.next())
+        })
+
+        electron.nativeTheme.on('updated', () => {
+            this.zone.run(() => this.themeChanged.next(this.getTheme()))
         })
     }
 
@@ -233,6 +239,23 @@ export class ElectronPlatformService extends PlatformService {
         this.electron.ipcRenderer.on('uncaughtException', (_$event, err) => {
             handler(err)
         })
+    }
+
+    async pickDirectory (): Promise<string> {
+        return (await this.electron.dialog.showOpenDialog(
+            this.hostWindow.getWindow(),
+            {
+                properties: ['openDirectory', 'showHiddenFiles'],
+            },
+        )).filePaths[0]
+    }
+
+    getTheme (): PlatformTheme {
+        if (this.electron.nativeTheme.shouldUseDarkColors) {
+            return 'dark'
+        } else {
+            return 'light'
+        }
     }
 }
 

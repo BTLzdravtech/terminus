@@ -18,7 +18,7 @@ export class CoreCommandProvider extends CommandProvider {
     }
 
     async activate () {
-        const profile = await this.profilesService.showProfileSelector()
+        const profile = await this.profilesService.showProfileSelector().catch(() => null)
         if (profile) {
             this.profilesService.launchProfile(profile)
         }
@@ -27,7 +27,7 @@ export class CoreCommandProvider extends CommandProvider {
     async provide (): Promise<Command[]> {
         return [
             {
-                id: 'profile-selector',
+                id: 'core:profile-selector',
                 locations: [CommandLocation.LeftToolbar, CommandLocation.StartPage],
                 label: this.translate.instant('Profiles & connections'),
                 icon: this.hostApp.platform === Platform.Web
@@ -35,7 +35,8 @@ export class CoreCommandProvider extends CommandProvider {
                     : require('./icons/profiles.svg'),
                 run: async () => this.activate(),
             },
-            ...this.profilesService.getRecentProfiles().map(profile => ({
+            ...this.profilesService.getRecentProfiles().map((profile, index) => ({
+                id: `core:recent-profile-${index}`,
                 label: profile.name,
                 locations: [CommandLocation.StartPage],
                 icon: require('./icons/history.svg'),

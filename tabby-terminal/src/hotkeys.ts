@@ -97,6 +97,14 @@ export class TerminalHotkeyProvider extends HotkeyProvider {
             id: 'scroll-to-bottom',
             name: this.translate.instant('Scroll terminal to bottom'),
         },
+        {
+            id: 'reconnect-tab',
+            name: this.translate.instant('Reconnect current tab (Serial/Telnet/SSH)'),
+        },
+        {
+            id: 'disconnect-tab',
+            name: this.translate.instant('Disconnect current tab (Serial/Telnet/SSH)'),
+        },
     ]
 
     constructor (private translate: TranslateService) { super() }

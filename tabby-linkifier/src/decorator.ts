@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@angular/core'
 import { ConfigService, PlatformService } from 'tabby-core'
 import { TerminalDecorator, BaseTerminalTabComponent, XTermFrontend } from 'tabby-terminal'
-import { WebLinksAddon } from 'xterm-addon-web-links'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import { LinkHandler } from './api'
 
 @Injectable()
@@ -14,7 +14,7 @@ export class LinkHighlighterDecorator extends TerminalDecorator {
         super()
     }
 
-    attach (tab: BaseTerminalTabComponent): void {
+    attach (tab: BaseTerminalTabComponent<any>): void {
         if (!(tab.frontend instanceof XTermFrontend)) {
             // not xterm
             return

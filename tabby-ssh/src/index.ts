@@ -1,3 +1,5 @@
+import './polyfills'
+
 import { NgModule } from '@angular/core'
 import { CommonModule } from '@angular/common'
 import { FormsModule } from '@angular/forms'
@@ -47,15 +49,6 @@ import { SFTPCreateDirectoryModalComponent } from './components/sftpCreateDirect
         { provide: TabContextMenuItemProvider, useClass: SFTPContextMenu, multi: true },
         { provide: ProfileProvider, useExisting: SSHProfilesService, multi: true },
         { provide: SFTPContextMenuItemProvider, useClass: CommonSFTPContextMenu, multi: true },
-    ],
-    entryComponents: [
-        SSHProfileSettingsComponent,
-        SFTPDeleteModalComponent,
-        SFTPCreateDirectoryModalComponent,
-        SSHPortForwardingModalComponent,
-        SSHSettingsTabComponent,
-        SSHTabComponent,
-        HostKeyPromptModalComponent,
     ],
     declarations: [
         SSHProfileSettingsComponent,

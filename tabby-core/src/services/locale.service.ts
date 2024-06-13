@@ -1,11 +1,13 @@
 import { Injectable } from '@angular/core'
 import { registerLocaleData } from '@angular/common'
-import { TranslateService } from '@ngx-translate/core'
+import { TranslateService, MissingTranslationHandler } from '@ngx-translate/core'
+import { TranslateMessageFormatCompiler } from 'ngx-translate-messageformat-compiler'
 
 import localeENUS from '@angular/common/locales/en'
 import localeENGB from '@angular/common/locales/en-GB'
 import localeAF from '@angular/common/locales/af'
 import localeBG from '@angular/common/locales/bg'
+import localeCS from '@angular/common/locales/cs'
 import localeDA from '@angular/common/locales/da'
 import localeDE from '@angular/common/locales/de'
 import localeES from '@angular/common/locales/es'
@@ -18,7 +20,9 @@ import localeKO from '@angular/common/locales/ko'
 import localePL from '@angular/common/locales/pl'
 import localePT from '@angular/common/locales/pt'
 import localeRU from '@angular/common/locales/ru'
+import localeSRSP from '@angular/common/locales/sr-Cyrl'
 import localeSV from '@angular/common/locales/sv'
+import localeTR from '@angular/common/locales/tr'
 import localeUK from '@angular/common/locales/uk'
 import localeZH from '@angular/common/locales/zh'
 import { Observable, Subject } from 'rxjs'
@@ -30,6 +34,7 @@ registerLocaleData(localeENUS)
 registerLocaleData(localeENGB)
 registerLocaleData(localeAF)
 registerLocaleData(localeBG)
+registerLocaleData(localeCS)
 registerLocaleData(localeDA)
 registerLocaleData(localeDE)
 registerLocaleData(localeES)
@@ -42,7 +47,9 @@ registerLocaleData(localeKO)
 registerLocaleData(localePL)
 registerLocaleData(localePT)
 registerLocaleData(localeRU)
+registerLocaleData(localeSRSP)
 registerLocaleData(localeSV)
+registerLocaleData(localeTR)
 registerLocaleData(localeUK)
 registerLocaleData(localeZH)
 
@@ -55,21 +62,16 @@ function flattenMessageFormatTranslation (po: any) {
     return translation
 }
 
-@Injectable({ providedIn: 'root' })
-export class TranslateServiceWrapper extends TranslateService {
-    private _defaultTranslation: Record<string, string>|null
+export class CustomMissingTranslationHandler extends MissingTranslationHandler {
+    compiler = new TranslateMessageFormatCompiler()
 
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-    getParsedResult (translations: any, key: any, interpolateParams?: any): any {
-        if (!this._defaultTranslation) {
-            const po = require(`../../../locale/en-US.po`)
-            this._defaultTranslation = flattenMessageFormatTranslation(po)
+    // eslint-disable-next-line @typescript-eslint/ban-types
+    handle (params: { key: string, translateService: TranslateService, interpolateParams?: Object }): any {
+        const v = this.compiler.compile(params.key, params.translateService.currentLang)
+        if (typeof v === 'string') {
+            return v
         }
-        this.translations[this.defaultLang][key] ??= this.compiler.compile(
-            this._defaultTranslation[key] || key,
-            this.defaultLang,
-        )
-        return super.getParsedResult(translations, key, interpolateParams ?? {})
+        return v(params.interpolateParams)
     }
 }
 
@@ -85,6 +87,10 @@ export class LocaleService {
         {
             code: 'id-ID',
             name: 'Bahasa Indonesia',
+        },
+        {
+            code: 'cs-CZ',
+            name: 'Čeština',
         },
         {
             code: 'da-DK',
@@ -135,12 +141,20 @@ export class LocaleService {
             name: 'Svenska',
         },
         {
+            code: 'tr-TR',
+            name: 'Türkçe',
+        },
+        {
             code: 'bg-BG',
             name: 'Български',
         },
         {
             code: 'ru-RU',
             name: 'Русский',
+        },
+        {
+            code: 'sr-SP',
+            name: 'Српски',
         },
         {
             code: 'uk-UA',
@@ -176,6 +190,7 @@ export class LocaleService {
         private translate: TranslateService,
         log: LogService,
     ) {
+        this.patchTranslateService(translate)
         this.logger = log.create('translate')
         config.changed$.subscribe(() => {
             this.refresh()
@@ -189,6 +204,24 @@ export class LocaleService {
             LocaleService.allLanguages.find(x => x.code === 'en-US')!.name = 'English (simplified)'
             LocaleService.allLanguages.find(x => x.code === 'en-GB')!.name = 'English (traditional)'
         }
+    }
+
+    private patchTranslateService (translate: TranslateService) {
+        translate['_defaultTranslation'] = null
+        const oldGetParsedResult = translate.getParsedResult.bind(translate)
+
+        // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+        translate.getParsedResult = function (translations: any, key: any, interpolateParams?: any): any {
+            if (!this._defaultTranslation) {
+                const po = require(`../../../locale/en-US.po`)
+                this._defaultTranslation = flattenMessageFormatTranslation(po)
+            }
+            this.translations[this.defaultLang][key] ??= this.compiler.compile(
+                this._defaultTranslation[key] || key,
+                this.defaultLang,
+            )
+            return oldGetParsedResult(translations, key, interpolateParams ?? {})
+        }.bind(translate)
     }
 
     refresh (): void {

@@ -11,13 +11,15 @@ appearance:
   tabsLocation: top
   tabsInFullscreen: false
   cycleTabs: true
-  theme: Standard
+  theme: Follow the color scheme
   frame: thin
   css: '/* * { color: blue !important; } */'
   opacity: 1.0
   vibrancy: false
   vibrancyType: 'blur'
   lastTabClosesWindow: false
+  spaciness: 1
+  colorSchemeMode: 'dark'
 terminal:
   showBuiltinProfiles: true
   showRecentProfiles: 3
@@ -30,6 +32,7 @@ hotkeys:
   profile-selectors:
     __nonStructural: true
 profiles: []
+groups: []
 profileDefaults:
   __nonStructural: true
   ssh:
@@ -45,8 +48,12 @@ vault: null
 encrypted: false
 enableExperimentalFeatures: false
 pluginBlacklist: []
+commandBlacklist: []
+providerBlacklist: []
+profileBlacklist: []
 hacks:
   disableGPU: false
   disableVibrancyWhileDragging: false
   enableFluentBackground: false
 language: null
+defaultQuickConnectProvider: "ssh"

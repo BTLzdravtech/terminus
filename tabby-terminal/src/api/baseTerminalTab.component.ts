@@ -1,23 +1,27 @@
-import { Observable, Subject, first, auditTime } from 'rxjs'
+import { Observable, Subject, first, auditTime, debounce, interval } from 'rxjs'
 import { Spinner } from 'cli-spinner'
 import colors from 'ansi-colors'
-import { NgZone, OnInit, OnDestroy, Injector, ViewChild, HostBinding, Input, ElementRef, InjectFlags } from '@angular/core'
+import { NgZone, OnInit, OnDestroy, Injector, ViewChild, HostBinding, Input, ElementRef, InjectFlags, Component } from '@angular/core'
 import { trigger, transition, style, animate, AnimationTriggerMetadata } from '@angular/animations'
-import { AppService, ConfigService, BaseTabComponent, HostAppService, HotkeysService, NotificationsService, Platform, LogService, Logger, TabContextMenuItemProvider, SplitTabComponent, SubscriptionContainer, MenuItemOptions, PlatformService, HostWindowService, ResettableTimeout, TranslateService } from 'tabby-core'
+import { AppService, ConfigService, BaseTabComponent, HostAppService, HotkeysService, NotificationsService, Platform, LogService, Logger, TabContextMenuItemProvider, SplitTabComponent, SubscriptionContainer, MenuItemOptions, PlatformService, HostWindowService, ResettableTimeout, TranslateService, ThemesService } from 'tabby-core'
 
 import { BaseSession } from '../session'
 
 import { Frontend } from '../frontends/frontend'
 import { XTermFrontend, XTermWebGLFrontend } from '../frontends/xtermFrontend'
-import { ResizeEvent } from './interfaces'
+import { ResizeEvent, BaseTerminalProfile } from './interfaces'
 import { TerminalDecorator } from './decorator'
 import { SearchPanelComponent } from '../components/searchPanel.component'
 import { MultifocusService } from '../services/multifocus.service'
 
+
+const INACTIVE_TAB_UNLOAD_DELAY = 1000 * 30
+
 /**
  * A class to base your custom terminal tabs on
  */
-export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit, OnDestroy {
+@Component({ template: '' })
+export class BaseTerminalTabComponent<P extends BaseTerminalProfile> extends BaseTabComponent implements OnInit, OnDestroy {
     static template: string = require<string>('../components/baseTerminalTab.component.pug')
     static styles: string[] = [require<string>('../components/baseTerminalTab.component.scss')]
     static animations: AnimationTriggerMetadata[] = [
@@ -90,8 +94,10 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     frontendReady = new Subject<void>()
     size: ResizeEvent
 
+    profile: P
+
     /**
-     * Enables normall passthrough from session output to terminal input
+     * Enables normal passthrough from session output to terminal input
      */
     enablePassthrough = true
 
@@ -119,12 +125,14 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     protected hostWindow: HostWindowService
     protected translate: TranslateService
     protected multifocus: MultifocusService
+    protected themes: ThemesService
     // Deps end
 
     protected logger: Logger
     protected output = new Subject<string>()
     protected binaryOutput = new Subject<Buffer>()
     protected sessionChanged = new Subject<BaseSession|null>()
+    protected recentInputs = ''
     private bellPlayer: HTMLAudioElement
     private termContainerSubscriptions = new SubscriptionContainer()
     private sessionHandlers = new SubscriptionContainer()
@@ -132,6 +140,9 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         stream: {
             write: x => {
                 try {
+                    if (!this.frontend) {
+                        return
+                    }
                     this.writeRaw(x)
                 } catch {
                     this.spinner.stop()
@@ -139,11 +150,13 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             },
         },
     })
+
     private spinnerActive = false
     private spinnerPaused = false
     private toolbarRevealTimeout = new ResettableTimeout(() => {
         this.revealToolbar = false
     }, 1000)
+
     private frontendWriteLock = Promise.resolve()
 
     get input$ (): Observable<Buffer> {
@@ -191,6 +204,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         this.hostWindow = injector.get(HostWindowService)
         this.translate = injector.get(TranslateService)
         this.multifocus = injector.get(MultifocusService)
+        this.themes = injector.get(ThemesService)
 
         this.logger = this.log.create('baseTerminalTab')
         this.setTitle(this.translate.instant('Terminal'))
@@ -203,6 +217,11 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                 this.showSearchPanel = true
                 setImmediate(() => {
                     const input = this.element.nativeElement.querySelector('.search-input')
+                    const selectedText = (this.frontend?.getSelection() ?? '').trim()
+                    if (input && selectedText.length) {
+                        input.value = selectedText
+                    }
+
                     input?.focus()
                     input?.select()
                 })
@@ -271,7 +290,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                     break
                 case 'delete-previous-word':
                     this.forEachFocusedTerminalPane(tab => {
-                        tab.sendInput('\x1b\x7f')
+                        tab.sendInput('\u0017')
                     })
                     break
                 case 'delete-next-word':
@@ -317,7 +336,30 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             this.frontend?.focus()
         })
 
-        const cls: new (..._) => Frontend = {
+        this.subscribeUntilDestroyed(this.platform.themeChanged$, () => {
+            this.configure()
+        })
+
+        // Check if the the WebGL renderer is compatible with xterm.js:
+        // - https://github.com/Eugeny/tabby/issues/8884
+        // - https://github.com/microsoft/vscode/issues/190195
+        // - https://github.com/xtermjs/xterm.js/issues/4665
+        // - https://bugs.chromium.org/p/chromium/issues/detail?id=1476475
+        //
+        // Inspired by https://github.com/microsoft/vscode/pull/191795
+
+        let enable8884Workarround = false
+        const checkCanvas = document.createElement('canvas')
+        const checkGl = checkCanvas.getContext('webgl2')
+        const debugInfo = checkGl?.getExtension('WEBGL_debug_renderer_info')
+        if (checkGl && debugInfo) {
+            const renderer = checkGl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+            if (renderer.startsWith('ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)')) {
+                enable8884Workarround = true
+            }
+        }
+
+        const cls: new (..._) => Frontend = enable8884Workarround ? XTermFrontend : {
             xterm: XTermFrontend,
             'xterm-webgl': XTermWebGLFrontend,
         }[this.config.store.terminal.frontend] ?? XTermFrontend
@@ -356,12 +398,12 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
 
         setImmediate(async () => {
             if (this.hasFocus) {
-                await this.frontend?.attach(this.content.nativeElement)
-                this.frontend?.configure()
+                await this.frontend?.attach(this.content.nativeElement, this.profile)
+                this.frontend?.configure(this.profile)
             } else {
                 this.focused$.pipe(first()).subscribe(async () => {
-                    await this.frontend?.attach(this.content.nativeElement)
-                    this.frontend?.configure()
+                    await this.frontend?.attach(this.content.nativeElement, this.profile)
+                    this.frontend?.configure(this.profile)
                 })
             }
         })
@@ -390,6 +432,24 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         this.blurred$.subscribe(() => {
             this.multifocus.cancel()
         })
+
+        this.visibility$
+            .pipe(debounce(visibility => interval(visibility ? 0 : INACTIVE_TAB_UNLOAD_DELAY)))
+            .subscribe(visibility => {
+                if (this.frontend instanceof XTermFrontend) {
+                    if (visibility) {
+                        // this.frontend.resizeHandler()
+                        const term = this.frontend.xterm as any
+                        term._core._renderService.clear()
+                        term._core._renderService.handleResize(term.cols, term.rows)
+                    } else {
+                        this.frontend.xterm.element?.querySelectorAll('canvas').forEach(c => {
+                            c.height = c.width = 0
+                            c.style.height = c.style.width = '0px'
+                        })
+                    }
+                }
+            })
     }
 
     protected onFrontendReady (): void {
@@ -402,6 +462,11 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                 this.frontend!.write('\r\n\r\n')
             }
         }
+
+        this.input$.subscribe(data => {
+            this.recentInputs += data
+            this.recentInputs = this.recentInputs.substring(this.recentInputs.length - 32)
+        })
     }
 
     async buildContextMenu (): Promise<MenuItemOptions[]> {
@@ -508,11 +573,12 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
      * Applies the user settings to the terminal
      */
     configure (): void {
-        this.frontend?.configure()
+        this.frontend?.configure(this.profile)
 
-        if (this.config.store.terminal.background === 'colorScheme') {
-            if (this.config.store.terminal.colorScheme.background) {
-                this.backgroundColor = this.config.store.terminal.colorScheme.background
+        if (!this.themes.findCurrentTheme().followsColorScheme && this.config.store.terminal.background === 'colorScheme') {
+            const scheme = this.profile.terminalColorScheme ?? this.config.store.terminal.colorScheme
+            if (scheme.background) {
+                this.backgroundColor = scheme.background
             }
         } else {
             this.backgroundColor = null
@@ -550,6 +616,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     /** @hidden */
     ngOnDestroy (): void {
         super.ngOnDestroy()
+        this.stopSpinner()
     }
 
     async destroy (): Promise<void> {
@@ -663,9 +730,9 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                 let wheelDeltaY = 0
 
                 if ('wheelDeltaY' in event) {
-                    wheelDeltaY = (event as WheelEvent)['wheelDeltaY']
+                    wheelDeltaY = (event as unknown as WheelEvent)['wheelDeltaY']
                 } else {
-                    wheelDeltaY = (event as WheelEvent).deltaY
+                    wheelDeltaY = (event as unknown as WheelEvent).deltaY
                 }
 
                 if (event.altKey) {
@@ -750,20 +817,42 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             }
         })
 
-        if (destroyOnSessionClose) {
-            this.attachSessionHandler(this.session.closed$, () => {
-                this.destroy()
-            })
-        }
+        this.attachSessionHandler(this.session.closed$, () => {
+            this.onSessionClosed(destroyOnSessionClose)
+        })
 
         this.attachSessionHandler(this.session.destroyed$, () => {
-            this.setSession(null)
+            this.onSessionDestroyed()
         })
 
         this.attachSessionHandler(this.session.oscProcessor.copyRequested$, content => {
             this.platform.setClipboard({ text: content })
             this.notifications.notice(this.translate.instant('Copied'))
         })
+    }
+
+    /**
+     * Method called when session is closed.
+     */
+    protected onSessionClosed (destroyOnSessionClose = false): void {
+        if (destroyOnSessionClose || this.shouldTabBeDestroyedOnSessionClose()) {
+            this.destroy()
+        }
+    }
+
+    /**
+     * Return true if tab should be destroyed on session closed.
+     */
+    protected shouldTabBeDestroyedOnSessionClose (): boolean {
+        const behavior = this.profile.behaviorOnSessionEnd
+        return behavior === 'close' || behavior === 'auto' && this.isSessionExplicitlyTerminated()
+    }
+
+    /**
+     * Method called when session is destroyed. Set the session to null
+     */
+    protected onSessionDestroyed (): void {
+        this.setSession(null)
     }
 
     protected detachSessionHandlers (): void {
@@ -809,7 +898,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         }
     }
 
-    protected forEachFocusedTerminalPane (cb: (tab: BaseTerminalTabComponent) => void): void {
+    protected forEachFocusedTerminalPane (cb: (tab: BaseTerminalTabComponent<any>) => void): void {
         if (this.parent && this.parent instanceof SplitTabComponent && this.parent._allFocusMode) {
             for (const tab of this.parent.getAllTabs()) {
                 if (tab instanceof BaseTerminalTabComponent) {
@@ -819,5 +908,12 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         } else {
             cb(this)
         }
+    }
+
+    /**
+     * Return true if the user explicitly exit the session
+     */
+    protected isSessionExplicitlyTerminated (): boolean {
+        return false
     }
 }

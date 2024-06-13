@@ -1,6 +1,6 @@
 {
   "name": "tabby-ssh",
-  "version": "1.0.189-nightly.2",
+  "version": "1.0.197-nightly.1",
   "description": "SSH connections for Tabby",
   "keywords": [
     "tabby-builtin-plugin"
@@ -22,9 +22,10 @@
   "author": "Eugene Pankov",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "16.0.1",
+    "@types/node": "20.3.1",
     "@types/ssh2": "^0.5.46",
     "ansi-colors": "^4.1.1",
+    "diffie-hellman": "^5.0.3",
     "sshpk": "Eugeny/node-sshpk#c2b71d1243714d2daf0988f84c3323d180817136",
     "strip-ansi": "^7.0.0"
   },
@@ -34,13 +35,13 @@
     "tmp-promise": "^3.0.3"
   },
   "peerDependencies": {
-    "@angular/animations": "^9.1.9",
-    "@angular/common": "^9.1.11",
-    "@angular/core": "^9.1.9",
-    "@angular/forms": "^9.1.11",
-    "@angular/platform-browser": "^9.1.11",
-    "@ng-bootstrap/ng-bootstrap": "^6.1.0",
-    "rxjs": "^6.5.5",
+    "@angular/animations": "^15",
+    "@angular/common": "^15",
+    "@angular/core": "^15",
+    "@angular/forms": "^15",
+    "@angular/platform-browser": "^15",
+    "@ng-bootstrap/ng-bootstrap": "^14",
+    "rxjs": "^7",
     "tabby-core": "*",
     "tabby-settings": "*",
     "tabby-terminal": "*"

@@ -55,8 +55,8 @@ function makeTabAnimation (dimension: string, size: number) {
 /** @hidden */
 @Component({
     selector: 'app-root',
-    template: require('./appRoot.component.pug'),
-    styles: [require('./appRoot.component.scss')],
+    templateUrl: './appRoot.component.pug',
+    styleUrls: ['./appRoot.component.scss'],
     animations: [
         trigger('animateTab', makeTabAnimation('width', 200)),
     ],
@@ -79,8 +79,8 @@ export class AppRootComponent {
 
     constructor (
         private hotkeys: HotkeysService,
-        private updater: UpdaterService,
         private commands: CommandService,
+        public updater: UpdaterService,
         public hostWindow: HostWindowService,
         public hostApp: HostAppService,
         public config: ConfigService,
@@ -90,6 +90,7 @@ export class AppRootComponent {
         ngbModal: NgbModal,
         _themes: ThemesService,
     ) {
+        // document.querySelector('app-root')?.remove()
         this.logger = log.create('main')
         this.logger.info('v', platform.getAppVersion())
 
@@ -238,5 +239,20 @@ export class AppRootComponent {
     private async getToolbarButtons (aboveZero: boolean): Promise<Command[]> {
         return (await this.commands.getCommands({ tab: this.app.activeTab ?? undefined }))
             .filter(x => x.locations?.includes(aboveZero ? CommandLocation.RightToolbar : CommandLocation.LeftToolbar))
+    }
+
+    toggleMaximize (): void {
+        this.hostWindow.toggleMaximize()
+    }
+
+    protected isTitleBarNeeded (): boolean {
+        return (
+            this.config.store.appearance.frame === 'full'
+            ||
+                this.hostApp.platform !== Platform.macOS
+                && this.config.store.appearance.frame === 'thin'
+                && this.config.store.appearance.tabsLocation !== 'top'
+                && this.config.store.appearance.tabsLocation !== 'bottom'
+        )
     }
 }
